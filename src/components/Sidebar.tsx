@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { useSidebar } from "./SidebarContext";
 
 /**
  * Menu da agência. Cada item declara a permissão que o libera — o menu mostra
@@ -69,8 +71,24 @@ export function Sidebar({
     (item) => !item.permission || permissions.includes(item.permission),
   );
 
+  const { open, close } = useSidebar();
+
+  // Fecha o drawer sempre que a rota muda (ex.: tocou num link do menu).
+  useEffect(() => {
+    close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[260px] shrink-0 flex-col border-r border-line bg-surface lg:flex">
+    <>
+      {open && (
+        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={close} aria-hidden="true" />
+      )}
+      <aside
+        className={`sticky top-0 z-40 flex h-dvh w-[260px] shrink-0 flex-col border-r border-line bg-surface transition-transform duration-200 ease-out max-lg:fixed max-lg:inset-y-0 max-lg:left-0 ${
+          open ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
+        }`}
+      >
       <Link href={home} className="flex items-center gap-3 px-5 py-6">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-brand-ink">
           <Zap size={20} strokeWidth={2.5} />
@@ -121,6 +139,7 @@ export function Sidebar({
           v1.0 · dados de demonstração
         </p>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

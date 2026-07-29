@@ -3,6 +3,7 @@ import { logout } from "@/lib/actions";
 import { currentUser } from "@/lib/auth";
 import { notificationsFor } from "@/lib/notifications";
 import { STAFF_ROLES } from "@/lib/permissions";
+import { MenuButton } from "./MenuButton";
 import { NotificationsBell } from "./NotificationsBell";
 import { ThemeToggle } from "./ThemeToggle";
 import { Avatar } from "./ui";
@@ -16,8 +17,11 @@ export async function Topbar({ crumb }: { crumb: string }) {
   const notifications = await notificationsFor(user);
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-line bg-surface/85 px-6 backdrop-blur">
-      <p className="truncate text-sm font-medium text-ink-2">{crumb}</p>
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-line bg-surface/85 px-4 backdrop-blur sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <MenuButton />
+        <p className="truncate text-sm font-medium text-ink-2">{crumb}</p>
+      </div>
 
       <div className="flex items-center gap-3">
         <ThemeToggle />

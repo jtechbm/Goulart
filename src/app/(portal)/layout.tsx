@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { SidebarProvider } from "@/components/SidebarContext";
 import { requireClient } from "@/lib/auth";
 
 /**
@@ -11,9 +12,11 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   const user = await requireClient();
 
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar variant="portal" subtitle={user.clientName ?? "Minha conta"} />
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-    </div>
+    <SidebarProvider>
+      <div className="flex min-h-dvh">
+        <Sidebar variant="portal" subtitle={user.clientName ?? "Minha conta"} />
+        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      </div>
+    </SidebarProvider>
   );
 }
