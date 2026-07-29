@@ -1,0 +1,349 @@
+// JtechERP — schema multi-marketplace
+// Dev usa SQLite. Para produção troque provider para "postgresql" e ajuste DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Acesso
+// ---------------------------------------------------------------------------
+
+/// ADMIN = Kadu e equipe da agência (vê a carteira toda).
+/// CLIENT = lojista assinante (vê só o próprio clientId).
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String
+  /// Em qual área a pessoa entra.
+  role   String // ADMIN | CLIENT
+  active Boolean @default(true)
+
+  /// Função dentro da agência — define o que ela vê. Ver src/lib/permissions.ts.
+  /// Só faz sentido quando role = ADMIN.
+  staffRole String? // diretor | analista | financeiro | suporte
+
+  /// Preenchido só para role=CLIENT — é o escopo de tudo que ele enxerga.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  teamMemberId String?
+  teamMember   TeamMember? @relation(fields: [teamMemberId], references: [id], onDelete: SetNull)
+
+  /// Senha provisória entregue pelo Kadu: força a troca no primeiro acesso.
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions Session[]
+
+  @@index([clientId])
+}
+
+model Session {
+  id     String @id @default(cuid())
+  token  String @unique
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Agência / equipe
+// ---------------------------------------------------------------------------
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      String // diretor | analista_senior | analista | atendimento
+  avatarHex String? // cor do avatar
+  createdAt DateTime @default(now())
+
+  accounts Account[]
+  users    User[]
+}
+
+// ---------------------------------------------------------------------------
+// Clientes da agência
+// ---------------------------------------------------------------------------
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  document  String? // CNPJ/CPF
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts     Account[]
+  invoices     Invoice[]
+  threads      Thread[]
+  users        User[]
+  subscription Subscription?
+}
+
+/// Contrato do cliente com a agência: o valor e o dia que geram as faturas.
+model Subscription {
+  id       String @id @default(cuid())
+  clientId String @unique
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  amount    Float
+  dueDay    Int      @default(10)
+  method    String   @default("PIX")
+  status    String   @default("ATIVA") // ATIVA | PAUSADA | CANCELADA
+  startedAt DateTime @default(now())
+  canceledAt DateTime?
+  notes     String?
+
+  invoices Invoice[]
+}
+
+// ---------------------------------------------------------------------------
+// Contas de marketplace conectadas
+// ---------------------------------------------------------------------------
+
+model Account {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  ownerId String?
+  owner   TeamMember? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  platform    String // MERCADO_LIVRE | SHOPEE | TIKTOK_SHOP
+  shopName    String
+  externalId  String // seller_id (ML) | shop_id (Shopee) | shop_id (TikTok)
+  shopCipher  String? // TikTok Shop exige cipher por loja
+  region      String? // Shopee/TikTok: BR, SG...
+  status      String  @default("PENDING") // CONNECTED | EXPIRED | ERROR | PENDING
+  statusNote  String?
+  reputation  String?
+  hasPenalty  Boolean @default(false)
+  penaltyNote String?
+
+  // Tokens OAuth (cifrados em repouso — ver src/lib/crypto.ts)
+  accessToken     String?
+  refreshToken    String?
+  accessExpiresAt DateTime?
+  refreshExpires  DateTime?
+
+  lastSyncAt   DateTime?
+  lastSyncNote String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  orders    Order[]
+  metrics   DailyMetric[]
+  analyses  Analysis[]
+  syncLogs  SyncLog[]
+  products  Product[]
+
+  @@unique([platform, externalId])
+  @@index([clientId])
+}
+
+// ---------------------------------------------------------------------------
+// Dados sincronizados dos marketplaces
+// ---------------------------------------------------------------------------
+
+model Order {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  externalId String
+  status     String
+  currency   String   @default("BRL")
+  gross      Float    @default(0) // valor bruto do pedido
+  fees       Float    @default(0) // comissão do marketplace
+  shipping   Float    @default(0)
+  itemsCount Int      @default(0)
+  buyerRef   String?
+  placedAt   DateTime
+  raw        String? // payload original (JSON)
+
+  @@unique([accountId, externalId])
+  @@index([accountId, placedAt])
+}
+
+/// Anúncio/produto da loja — a base da tela de estoque.
+model Product {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  externalId String
+  sku        String?
+  title      String
+  price      Float   @default(0)
+  currency   String  @default("BRL")
+  stock      Int     @default(0)
+  status     String  @default("active") // active | paused | closed
+  imageUrl   String?
+  permalink  String?
+  soldCount  Int     @default(0)
+  syncedAt   DateTime @default(now())
+
+  /// SYNCED = veio do marketplace (o sync manda nele).
+  /// MANUAL = criado aqui dentro; o sync não sobrescreve nem apaga.
+  origin String @default("SYNCED")
+
+  /// Identificadores da plataforma necessários para escrever estoque de volta
+  /// (model_id da Shopee, sku_id + warehouse_id do TikTok). JSON.
+  meta String?
+
+  movements StockMovement[]
+
+  @@unique([accountId, externalId])
+  @@index([accountId, stock])
+}
+
+/// Livro-caixa do estoque: toda entrada/saída fica registrada com autor e motivo.
+model StockMovement {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Positivo = entrada, negativo = saída.
+  delta       Int
+  stockBefore Int
+  stockAfter  Int
+  reason      String // COMPRA | VENDA | AJUSTE | PERDA | DEVOLUCAO
+  note        String?
+
+  authorId   String?
+  authorName String
+
+  /// Se o estoque foi propagado para o marketplace.
+  pushed     Boolean @default(false)
+  pushError  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+}
+
+model DailyMetric {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  day      DateTime
+  revenue  Float    @default(0)
+  orders   Int      @default(0)
+  units    Int      @default(0)
+  adsSpend Float    @default(0)
+  fees     Float    @default(0)
+  visits   Int      @default(0)
+
+  @@unique([accountId, day])
+  @@index([day])
+}
+
+model SyncLog {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  kind      String // orders | metrics | token_refresh | ads
+  ok        Boolean
+  message   String?
+  itemCount Int      @default(0)
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+
+  @@index([accountId, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Operação da agência
+// ---------------------------------------------------------------------------
+
+model Analysis {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  title     String
+  verdict   String // SAUDAVEL | ATENCAO | CRITICO
+  summary   String
+  focuses   String // JSON: [{ title, verdict, finding, action }]
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+}
+
+model Invoice {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  amount    Float
+  dueDay    Int      @default(10)
+  dueDate   DateTime
+  method    String   @default("PIX")
+  status    String   @default("PENDENTE") // PAGO | PENDENTE | ATRASADO
+  paidAt    DateTime?
+  paidNote  String? // como o Kadu deu baixa (ex.: "PIX recebido 12/07")
+  /// Competência "AAAA-MM" — garante uma fatura por mês por cliente.
+  reference String
+  createdAt DateTime @default(now())
+
+  @@unique([clientId, reference])
+  @@index([clientId, dueDate])
+}
+
+model Thread {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  subject   String?
+  unread    Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  messages Message[]
+}
+
+model Message {
+  id       String @id @default(cuid())
+  threadId String
+  thread   Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  authorType String // CLIENT | AGENCY | SYSTEM
+  authorName String
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+// Guarda o state/PKCE do OAuth entre o /start e o /callback
+model OAuthState {
+  id        String   @id @default(cuid())
+  state     String   @unique
+  platform  String
+  clientId  String?
+  verifier  String? // PKCE (Mercado Livre)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}

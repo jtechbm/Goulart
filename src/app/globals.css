@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   JtechERP — tokens
+   Chrome da UI: ramp roxa da marca.
+   Cores de série dos gráficos: paleta categórica validada (violet/orange/aqua)
+   — ver scripts/validate_palette.js do skill dataviz. Não trocar sem revalidar.
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+
+  /* superfícies */
+  --plane: #0b0810;
+  --surface: #16121f;
+  --surface-2: #1d1830;
+  --surface-3: #251f3b;
+  --border: #2c2440;
+  --border-strong: #3b3154;
+
+  /* tinta */
+  --ink: #f5f3fa;
+  --ink-2: #b7afc9;
+  --ink-muted: #8b8299;
+
+  /* marca */
+  --brand: #8b5cf6;
+  --brand-hover: #a78bfa;
+  --brand-ink: #ffffff;
+  --brand-soft: rgba(139, 92, 246, 0.16);
+  --brand-ring: rgba(139, 92, 246, 0.42);
+
+  /* status (escala fixa — nunca tematizada) */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-text: #0ca30c;
+
+  /* séries dos gráficos — steps do modo escuro */
+  --series-1: #9085e9;
+  --series-2: #d95926;
+  --series-3: #199e70;
+
+  /* cromo dos gráficos */
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --axis-ink: #898781;
+
+  /* badges dos marketplaces */
+  --ml: #f2c94c;
+  --ml-bg: rgba(242, 201, 76, 0.14);
+  --shopee: #f2734c;
+  --shopee-bg: rgba(242, 115, 76, 0.14);
+  --tiktok: #e879b9;
+  --tiktok-bg: rgba(232, 121, 185, 0.14);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --plane: #f7f5fb;
+  --surface: #fcfbfe;
+  --surface-2: #f3f0fa;
+  --surface-3: #ebe6f6;
+  --border: #e2dcf0;
+  --border-strong: #cec5e4;
+
+  --ink: #17121f;
+  --ink-2: #4f4661;
+  --ink-muted: #7a7189;
+
+  --brand: #7c3aed;
+  --brand-hover: #6d28d9;
+  --brand-ink: #ffffff;
+  --brand-soft: rgba(124, 58, 237, 0.1);
+  --brand-ring: rgba(124, 58, 237, 0.35);
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-text: #006300;
+
+  /* mesmos matizes, steps do modo claro */
+  --series-1: #4a3aa7;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --axis-ink: #898781;
+
+  --ml: #9a7b0d;
+  --ml-bg: rgba(242, 201, 76, 0.2);
+  --shopee: #c4471d;
+  --shopee-bg: rgba(242, 115, 76, 0.16);
+  --tiktok: #a8347c;
+  --tiktok-bg: rgba(232, 121, 185, 0.16);
+}
+
+@theme inline {
+  --color-plane: var(--plane);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-muted: var(--ink-muted);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+
+  --color-good: var(--good);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Números que alinham em coluna (tabelas, eixos) usam tabular. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
