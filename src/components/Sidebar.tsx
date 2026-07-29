@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Plug,
   Receipt,
+  Scale,
   Settings,
   Store,
   Users,
@@ -58,18 +59,24 @@ export function Sidebar({
   subtitle,
   permissions = [],
   home: homeHref,
+  kadu = false,
 }: {
   variant: "admin" | "portal";
   subtitle: string;
   /** Permissões da sessão; ignorado no portal, onde o cliente vê tudo que é dele. */
   permissions?: readonly string[];
   home?: string;
+  /** Libera itens que são só do Kadu (a pessoa), não do cargo — ver requireKadu. */
+  kadu?: boolean;
 }) {
   const pathname = usePathname();
   const home = homeHref ?? (variant === "admin" ? "/" : "/portal");
   const nav = (variant === "admin" ? ADMIN_NAV : PORTAL_NAV).filter(
     (item) => !item.permission || permissions.includes(item.permission),
   );
+  if (variant === "admin" && kadu) {
+    nav.push({ href: "/comparador", label: "Comparador de preços", Icon: Scale, permission: null });
+  }
 
   const { open, close } = useSidebar();
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarProvider } from "@/components/SidebarContext";
-import { requireAdmin } from "@/lib/auth";
+import { isKadu, requireAdmin } from "@/lib/auth";
 import { landingFor, STAFF_ROLES } from "@/lib/permissions";
 
 /**
@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           subtitle={STAFF_ROLES[user.staffRole].label}
           permissions={user.permissions}
           home={landingFor(user.staffRole)}
+          kadu={isKadu(user)}
         />
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>

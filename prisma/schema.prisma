@@ -209,7 +209,8 @@ model Product {
   /// (model_id da Shopee, sku_id + warehouse_id do TikTok). JSON.
   meta String?
 
-  movements StockMovement[]
+  movements         StockMovement[]
+  marketComparisons MarketComparison[]
 
   @@unique([accountId, externalId])
   @@index([accountId, stock])
@@ -234,6 +235,33 @@ model StockMovement {
   /// Se o estoque foi propagado para o marketplace.
   pushed     Boolean @default(false)
   pushError  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+}
+
+/// Comparação manual do preço de um produto do cliente com um concorrente na
+/// MESMA plataforma. Sem integração ainda — o Kadu digita o que encontrou.
+/// Acesso restrito a ele (ver `requireKadu` em src/lib/auth.ts): é ferramenta
+/// de precificação da agência, não faz sentido para clientes nem pra equipe.
+model MarketComparison {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Copiado de product.account.platform na criação — trava a comparação na
+  /// mesma plataforma do anúncio do cliente.
+  platform String
+
+  competitorSeller String
+  competitorTitle  String
+  competitorPrice  Float
+  competitorUrl    String?
+  note             String?
+
+  authorId   String?
+  authorName String
 
   createdAt DateTime @default(now())
 

@@ -21,6 +21,13 @@ export { hashPassword, verifyPassword } from "./password";
 const COOKIE = "jtech_session";
 const SESSION_DAYS = 30;
 
+/**
+ * Algumas ferramentas são do Kadu, não do cargo "diretor" — se amanhã outra
+ * pessoa virar diretora, ela não herda isso automaticamente. Por isso o
+ * controle aqui é pelo e-mail da pessoa, não pela função.
+ */
+const KADU_EMAIL = "kadu@jtech.com.br";
+
 /* -------------------------------------------------------------------------- */
 /* Sessão                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -112,6 +119,17 @@ export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
   // um cliente que tenta abrir a área da agência volta para o portal dele
   if (user.role !== "ADMIN") redirect("/portal");
+  return user;
+}
+
+export function isKadu(user: { email: string }): boolean {
+  return user.email === KADU_EMAIL;
+}
+
+/** Guarda de rota para ferramentas pessoais do Kadu (ex.: comparador de preços). */
+export async function requireKadu(): Promise<SessionUser> {
+  const user = await requireAdmin();
+  if (!isKadu(user)) redirect(homeFor(user));
   return user;
 }
 
