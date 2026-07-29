@@ -1,13 +1,15 @@
 // JtechERP — schema multi-marketplace
-// Dev usa SQLite. Para produção troque provider para "postgresql" e ajuste DATABASE_URL.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled (pgbouncer) — usado em runtime serverless.
+  url       = env("DATABASE_URL")
+  // Conexão direta — usada só por `prisma db push`/`migrate`.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
