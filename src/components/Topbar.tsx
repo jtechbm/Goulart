@@ -1,20 +1,18 @@
 import { LogOut } from "lucide-react";
+import { Suspense } from "react";
 import { logout } from "@/lib/actions";
 import { currentUser } from "@/lib/auth";
-import { notificationsFor } from "@/lib/notifications";
 import { STAFF_ROLES } from "@/lib/permissions";
 import { MenuButton } from "./MenuButton";
-import { NotificationsBell } from "./NotificationsBell";
+import { NotificationsFallback, NotificationsSlot } from "./NotificationsSlot";
 import { ThemeToggle } from "./ThemeToggle";
 import { Avatar } from "./ui";
 
 export async function Topbar({ crumb }: { crumb: string }) {
   // Os layouts de (admin)/(portal) já garantiram a sessão antes de chegar aqui.
+  // `currentUser` está em cache: aqui não custa consulta nova.
   const user = await currentUser();
   if (!user) return null;
-
-  // A lista já vem filtrada pela permissão de quem está olhando.
-  const notifications = await notificationsFor(user);
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-line bg-surface/85 px-4 backdrop-blur sm:px-6">
@@ -25,7 +23,10 @@ export async function Topbar({ crumb }: { crumb: string }) {
 
       <div className="flex items-center gap-3">
         <ThemeToggle />
-        <NotificationsBell items={notifications} />
+        {/* O sino busca no banco; atrás do Suspense ele não segura a página. */}
+        <Suspense fallback={<NotificationsFallback />}>
+          <NotificationsSlot />
+        </Suspense>
 
         <div className="flex items-center gap-2.5 border-l border-line pl-3">
           <Avatar name={user.name} />
