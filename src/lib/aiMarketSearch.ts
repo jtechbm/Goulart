@@ -20,6 +20,14 @@ import type { CompetitorProduct } from "./priceCompare";
 
 export const AI_SEARCH_PLATFORMS = ["SHOPEE", "TIKTOK_SHOP"] as const;
 
+/**
+ * Teto de anúncios gravados por busca. Existe como rede de segurança: num
+ * teste com gpt-4.1 o modelo entrou em repetição e devolveu 199 entradas —
+ * os mesmos 10 anúncios vinte vezes. Para a mediana, uma dúzia de anúncios
+ * distintos já basta.
+ */
+const MAX_ANUNCIOS = 12;
+
 export function supportsAiSearch(platform: string): boolean {
   return (AI_SEARCH_PLATFORMS as readonly string[]).includes(platform);
 }
@@ -181,15 +189,30 @@ export const searchWithAi = cache(async function searchWithAi(
     const dados = JSON.parse(texto) as { anuncios?: Anuncio[]; observacao?: string };
 
     const produtos: CompetitorProduct[] = [];
+    const vistos = new Set<string>();
     let descartados = 0;
+    let repetidos = 0;
 
     for (const [i, a] of (dados.anuncios ?? []).entries()) {
+      if (produtos.length >= MAX_ANUNCIOS) break;
+
       const preco = Number(a.preco);
       if (!Number.isFinite(preco) || preco <= 0) continue;
       if (!precoConfere(preco, a.trecho_origem ?? "")) {
         descartados++;
         continue;
       }
+
+      // Um modelo pode entrar em repetição e devolver o mesmo anúncio dezenas
+      // de vezes (visto com gpt-4.1 neste mesmo esquema). Sem esta guarda, a
+      // repetição entraria no banco e enviesaria a mediana.
+      const chave = `${a.url?.trim() || ""}|${a.titulo?.trim() ?? ""}|${preco}`;
+      if (vistos.has(chave)) {
+        repetidos++;
+        continue;
+      }
+      vistos.add(chave);
+
       produtos.push({
         externalId: `ai-${platform}-${i}`,
         shopId: a.vendedor?.trim() || null,
@@ -214,6 +237,7 @@ export const searchWithAi = cache(async function searchWithAi(
     const notas = [
       dados.observacao?.trim(),
       descartados > 0 ? `${descartados} resultado(s) descartado(s) por não conferir com a fonte.` : "",
+      repetidos > 0 ? `${repetidos} repetido(s) ignorado(s).` : "",
     ]
       .filter(Boolean)
       .join(" ");
