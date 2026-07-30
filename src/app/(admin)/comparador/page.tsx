@@ -1,80 +1,24 @@
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
-import { revalidatePath } from "next/cache";
+import { ExternalLink, Search, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Card, CardHeader, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { requireKadu } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { brl, date, variation } from "@/lib/format";
+import { brl, variation } from "@/lib/format";
+import { searchCompetitors, supportsAutoSearch } from "@/lib/marketSearch";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Ferramenta pessoal do Kadu: comparar o preço de um produto do cliente com o
- * que a concorrência cobra na MESMA plataforma. Sem integração ainda — os
- * dados do concorrente são digitados à mão (fictícios ou pesquisados).
+ * Ferramenta pessoal do Kadu: ao escolher um produto do cliente, o sistema
+ * busca sozinho os concorrentes do MESMO produto na MESMA plataforma e mostra
+ * a régua de preços. Nada é digitado à mão.
  */
-
-async function adicionarComparacao(formData: FormData) {
-  "use server";
-  const user = await requireKadu();
-
-  const clientId = String(formData.get("clientId") ?? "");
-  const productId = String(formData.get("productId") ?? "");
-  const back = (qs = "") => `/comparador?cliente=${clientId}&produto=${productId}${qs}`;
-
-  const competitorSeller = String(formData.get("competitorSeller") ?? "").trim();
-  const competitorTitle = String(formData.get("competitorTitle") ?? "").trim();
-  const competitorPrice = Number(formData.get("competitorPrice") ?? 0);
-  const competitorUrl = String(formData.get("competitorUrl") ?? "").trim() || null;
-  const note = String(formData.get("note") ?? "").trim() || null;
-
-  if (!competitorSeller || !competitorTitle || !(competitorPrice > 0)) {
-    redirect(back(`&erro=${encodeURIComponent("Preencha vendedor, anúncio e um preço válido.")}`));
-  }
-
-  const product = await prisma.product.findUnique({ where: { id: productId }, include: { account: true } });
-  if (!product || product.account.clientId !== clientId) {
-    redirect(back(`&erro=${encodeURIComponent("Produto não encontrado para este cliente.")}`));
-  }
-
-  await prisma.marketComparison.create({
-    data: {
-      productId,
-      platform: product.account.platform,
-      competitorSeller,
-      competitorTitle,
-      competitorPrice,
-      competitorUrl,
-      note,
-      authorId: user.id,
-      authorName: user.name,
-    },
-  });
-
-  revalidatePath("/comparador");
-  redirect(back("&ok=Comparação adicionada."));
-}
-
-async function removerComparacao(formData: FormData) {
-  "use server";
-  await requireKadu();
-
-  const id = String(formData.get("id") ?? "");
-  const clientId = String(formData.get("clientId") ?? "");
-  const productId = String(formData.get("productId") ?? "");
-
-  if (id) await prisma.marketComparison.delete({ where: { id } }).catch(() => {});
-
-  revalidatePath("/comparador");
-  redirect(`/comparador?cliente=${clientId}&produto=${productId}&ok=Comparação removida.`);
-}
 
 export default async function ComparadorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cliente?: string; produto?: string; ok?: string; erro?: string }>;
+  searchParams: Promise<{ cliente?: string; produto?: string }>;
 }) {
   await requireKadu();
   const sp = await searchParams;
@@ -94,52 +38,22 @@ export default async function ComparadorPage({
     clientId && productId
       ? prisma.product.findFirst({
           where: { id: productId, account: { clientId } },
-          include: {
-            account: { select: { shopName: true, platform: true, client: { select: { name: true } } } },
-            marketComparisons: { orderBy: { createdAt: "desc" } },
-          },
+          include: { account: { select: { shopName: true, platform: true } } },
         })
       : Promise.resolve(null),
   ]);
 
-  const prices = product?.marketComparisons.map((c) => c.competitorPrice) ?? [];
-  const cheapest = prices.length ? Math.min(...prices) : null;
+  // A busca só acontece depois que há um produto escolhido.
+  const resultado = product ? await searchCompetitors(product.account.platform, product.title) : null;
 
   return (
     <>
       <Topbar crumb="Comparador de preços" />
-      <main className="flex-1 px-6 py-8">
+      <main className="flex-1 px-4 py-8 sm:px-6">
         <PageHeader
           title="Comparador de preços"
-          subtitle="Ferramenta pessoal — compare o preço de um produto do cliente com a concorrência na mesma plataforma."
+          subtitle="Escolha um produto do cliente — o sistema busca os concorrentes na mesma plataforma."
         />
-
-        {sp.ok && (
-          <p
-            role="status"
-            className="mb-5 rounded-xl border px-4 py-3 text-[13px]"
-            style={{
-              borderColor: "var(--good)",
-              backgroundColor: "color-mix(in srgb, var(--good) 10%, transparent)",
-              color: "var(--good-text)",
-            }}
-          >
-            {sp.ok}
-          </p>
-        )}
-        {sp.erro && (
-          <p
-            role="alert"
-            className="mb-5 rounded-xl border px-4 py-3 text-[13px]"
-            style={{
-              borderColor: "var(--critical)",
-              backgroundColor: "color-mix(in srgb, var(--critical) 10%, transparent)",
-              color: "var(--critical)",
-            }}
-          >
-            {sp.erro}
-          </p>
-        )}
 
         <Card className="mb-6">
           <CardHeader title="1. Cliente" subtitle="De quem é o produto que você quer comparar." />
@@ -167,176 +81,169 @@ export default async function ComparadorPage({
 
         {clientId && (
           <Card className="mb-6">
-            <CardHeader title="2. Produto" subtitle="O anúncio do cliente que você quer olhar contra o mercado." />
+            <CardHeader title="2. Produto" subtitle="Clique em Comparar — a busca é automática." />
             {products.length === 0 ? (
               <Empty
                 title="Este cliente não tem produtos"
-                hint="Conecte uma loja e rode o sync, ou cadastre um produto manual no Estoque."
+                hint="Conecte uma loja e rode o sync, ou cadastre um produto no Estoque."
               />
             ) : (
               <ul className="divide-y divide-[var(--border)]">
-                {products.map((p) => (
-                  <li key={p.id} className="flex items-center gap-4 px-5 py-3.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-sm font-medium text-ink">{p.title}</p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <PlatformBadge platform={p.account.platform} short />
-                        <span className="text-[13px] text-ink-muted">{p.account.shopName}</span>
-                        {p.sku && <span className="text-[13px] text-ink-muted">· SKU {p.sku}</span>}
+                {products.map((p) => {
+                  const auto = supportsAutoSearch(p.account.platform);
+                  return (
+                    <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-1 text-sm font-medium text-ink">{p.title}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <PlatformBadge platform={p.account.platform} short />
+                          <span className="text-[13px] text-ink-muted">{p.account.shopName}</span>
+                          {p.sku && <span className="text-[13px] text-ink-muted">· SKU {p.sku}</span>}
+                        </div>
                       </div>
-                    </div>
-                    <span className="shrink-0 text-sm font-semibold text-ink tabular">{brl(p.price)}</span>
-                    <Link
-                      href={`/comparador?cliente=${clientId}&produto=${p.id}`}
-                      aria-current={p.id === productId ? "true" : undefined}
-                      className={`shrink-0 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                        p.id === productId
-                          ? "border-brand bg-brand-soft text-brand"
-                          : "border-line text-ink-2 hover:border-line-strong hover:text-ink"
-                      }`}
-                    >
-                      Comparar
-                    </Link>
-                  </li>
-                ))}
+                      <span className="shrink-0 text-sm font-semibold text-ink tabular">{brl(p.price)}</span>
+                      {auto ? (
+                        <Link
+                          href={`/comparador?cliente=${clientId}&produto=${p.id}`}
+                          aria-current={p.id === productId ? "true" : undefined}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                            p.id === productId
+                              ? "border-brand bg-brand-soft text-brand"
+                              : "border-line text-ink-2 hover:border-line-strong hover:text-ink"
+                          }`}
+                        >
+                          <Search size={13} /> Comparar
+                        </Link>
+                      ) : (
+                        <span
+                          title="Busca automática disponível apenas no Mercado Livre"
+                          className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-ink-muted"
+                        >
+                          Indisponível
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
         )}
 
-        {product && (
+        {product && resultado && (
           <>
-            <div className="mb-6 grid gap-4 sm:grid-cols-3">
-              <Stat label="Seu preço" value={brl(product.price)} tone="brand" />
-              <Stat
-                label="Menor preço encontrado"
-                value={cheapest !== null ? brl(cheapest) : "—"}
-                hint={cheapest !== null && cheapest < product.price ? "abaixo do seu preço" : undefined}
-                tone="series-2"
-              />
-              <Stat label="Comparações registradas" value={String(product.marketComparisons.length)} tone="series-1" />
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
+            {!resultado.ok ? (
               <Card>
-                <CardHeader
-                  title="Adicionar comparação"
-                  subtitle="Anúncio concorrente na mesma plataforma do produto."
-                  action={<PlatformBadge platform={product.account.platform} short />}
+                <CardHeader title={product.title} action={<PlatformBadge platform={product.account.platform} short />} />
+                <Empty
+                  title={
+                    resultado.reason === "unsupported"
+                      ? "Busca automática indisponível nesta plataforma"
+                      : resultado.reason === "no_results"
+                        ? "Nenhum concorrente encontrado"
+                        : "Não foi possível buscar agora"
+                  }
+                  hint={resultado.message}
                 />
-                <form action={adicionarComparacao} className="space-y-3 px-5 py-5">
-                  <input type="hidden" name="clientId" value={clientId} />
-                  <input type="hidden" name="productId" value={product.id} />
-                  <input
-                    name="competitorSeller"
-                    required
-                    placeholder="Vendedor / loja concorrente"
-                    className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted"
-                  />
-                  <input
-                    name="competitorTitle"
-                    required
-                    placeholder="Título do anúncio encontrado"
-                    className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted"
-                  />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <input
-                      name="competitorPrice"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      required
-                      placeholder="Preço encontrado"
-                      className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular placeholder:text-ink-muted"
-                    />
-                    <input
-                      name="competitorUrl"
-                      type="url"
-                      placeholder="Link do anúncio (opcional)"
-                      className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted"
-                    />
-                  </div>
-                  <textarea
-                    name="note"
-                    rows={2}
-                    placeholder="Nota (opcional) — frete, condição, cupom..."
-                    className="w-full resize-none rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted"
-                  />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover"
-                  >
-                    <Plus size={15} /> Adicionar comparação
-                  </button>
-                </form>
               </Card>
+            ) : (
+              (() => {
+                const a = resultado.analysis;
+                const vsMediana = variation(product.price, a.medianPrice);
+                return (
+                  <>
+                    <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                      <Stat label="Seu preço" value={brl(product.price)} tone="brand" />
+                      {/* Sem o componente Delta aqui de propósito: ele pinta
+                          alta de verde, e estar acima da mediana é justamente
+                          o alerta — o verde leria como se fosse bom. */}
+                      <Stat
+                        label="Mediana do mercado"
+                        value={brl(a.medianPrice)}
+                        hint={
+                          Math.abs(vsMediana) < 1
+                            ? "seu preço está no mesmo nível"
+                            : `seu preço está ${Math.abs(vsMediana).toFixed(0)}% ${vsMediana > 0 ? "acima" : "abaixo"}`
+                        }
+                        tone={vsMediana > 15 ? "series-2" : "series-1"}
+                      />
+                      <Stat
+                        label="Média (sem extremos)"
+                        value={brl(a.averagePrice)}
+                        hint="descarta 10% de cada ponta"
+                        tone="series-3"
+                      />
+                      <Stat label="Menor preço" value={brl(a.minPrice)} tone="good" />
+                      <Stat
+                        label="Ofertas analisadas"
+                        value={String(a.totalAnalyzed)}
+                        hint={`até ${brl(a.maxPrice)}`}
+                        tone="series-2"
+                      />
+                    </div>
 
-              <Card>
-                <CardHeader title="Comparações" subtitle={product.title} />
-                {product.marketComparisons.length === 0 ? (
-                  <Empty
-                    title="Nenhuma comparação ainda"
-                    hint="Adicione um anúncio concorrente ao lado — pode ser fictício, é só pra ter o que comparar."
-                  />
-                ) : (
-                  <ul className="divide-y divide-[var(--border)]">
-                    {product.marketComparisons.map((c) => {
-                      const diff = variation(c.competitorPrice, product.price);
-                      return (
-                        <li key={c.id} className="px-5 py-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="line-clamp-1 text-sm font-medium text-ink">{c.competitorTitle}</p>
-                              <p className="mt-0.5 text-[13px] text-ink-muted">{c.competitorSeller}</p>
-                            </div>
-                            <span className="shrink-0 text-sm font-semibold text-ink tabular">
-                              {brl(c.competitorPrice)}
-                            </span>
-                          </div>
+                    <Card>
+                      <CardHeader
+                        title="Concorrentes"
+                        subtitle={`Mesmo produto de catálogo — ${product.title}`}
+                        action={<PlatformBadge platform={product.account.platform} short />}
+                      />
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+                              <th className="px-5 py-3.5">Anúncio</th>
+                              <th className="px-5 py-3.5">Vendedor</th>
+                              <th className="px-5 py-3.5 text-right">Preço</th>
+                              <th className="px-5 py-3.5 text-right">vs. seu preço</th>
+                              <th className="px-5 py-3.5" />
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)]">
+                            {a.productsList.map((c) => {
+                              const diff = variation(c.price, product.price);
+                              return (
+                                <tr key={c.externalId} className="transition-colors hover:bg-surface-2">
+                                  <td className="px-5 py-3">
+                                    <p className="line-clamp-1 text-ink">{c.title}</p>
+                                  </td>
+                                  <td className="px-5 py-3 text-[13px] text-ink-muted tabular">{c.shopId ?? "—"}</td>
+                                  <td className="px-5 py-3 text-right font-semibold text-ink tabular">
+                                    {brl(c.price)}
+                                  </td>
+                                  <td className="px-5 py-3 text-right">
+                                    <Delta value={diff} />
+                                  </td>
+                                  <td className="px-5 py-3 text-right">
+                                    {c.url && (
+                                      <a
+                                        href={c.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label={`Abrir anúncio de ${c.title}`}
+                                        className="inline-flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
+                                      >
+                                        Ver <ExternalLink size={12} />
+                                      </a>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
 
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <Delta value={diff} />
-                            <span className="text-[12px] text-ink-muted">
-                              {diff > 0 ? "concorrente mais caro que você" : diff < 0 ? "concorrente mais barato que você" : "mesmo preço"}
-                            </span>
-                          </div>
-
-                          {c.note && <p className="mt-2 text-[13px] text-ink-2">{c.note}</p>}
-
-                          <div className="mt-2 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              {c.competitorUrl && (
-                                <a
-                                  href={c.competitorUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
-                                >
-                                  Ver anúncio <ExternalLink size={12} />
-                                </a>
-                              )}
-                              <span className="text-[12px] text-ink-muted">{date(c.createdAt)}</span>
-                            </div>
-                            <form action={removerComparacao}>
-                              <input type="hidden" name="id" value={c.id} />
-                              <input type="hidden" name="clientId" value={clientId} />
-                              <input type="hidden" name="productId" value={product.id} />
-                              <button
-                                type="submit"
-                                aria-label="Remover comparação"
-                                className="grid size-7 place-items-center rounded-lg text-ink-muted transition-colors hover:text-critical"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </form>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </Card>
-            </div>
+                    <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-muted">
+                      <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
+                      Preços do catálogo do Mercado Livre, atualizados a cada hora. A correspondência é por título —
+                      confira o anúncio antes de decidir preço.
+                    </p>
+                  </>
+                );
+              })()
+            )}
           </>
         )}
 
@@ -344,7 +251,7 @@ export default async function ComparadorPage({
           <Card>
             <Empty
               title="Escolha um cliente para começar"
-              hint="Depois selecione o produto dele e adicione o que encontrar na concorrência."
+              hint="Depois clique em Comparar num produto — o resto é automático."
             />
           </Card>
         )}
