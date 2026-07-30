@@ -7,8 +7,14 @@
  * imediatamente e o conteúdo entra por cima quando chega.
  */
 
+/**
+ * `--surface-2` é quase idêntico a `--surface` (#1d1830 contra #16121f): o
+ * esqueleto ficava tecnicamente presente e visualmente invisível. Usamos
+ * `--surface-3` com um brilho deslizante — movimento chama mais atenção que
+ * variação de opacidade num tema escuro.
+ */
 export function SkeletonBar({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-surface-2 ${className}`} aria-hidden />;
+  return <div className={`skeleton-shimmer rounded-lg ${className}`} aria-hidden />;
 }
 
 export function SkeletonStat() {
