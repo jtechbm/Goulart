@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "./db";
 import {
   can,
@@ -68,12 +69,22 @@ export type SessionUser = {
   mustChangePassword: boolean;
 };
 
-export async function currentUser(): Promise<SessionUser | null> {
+/**
+ * Envolvido em `cache()` do React: numa mesma renderização o layout, o guard da
+ * página e o Topbar chamam isto de forma independente. Sem o cache eram três
+ * consultas idênticas de sessão por page view — três idas ao banco em fila.
+ * O cache vale só para a requisição atual, então não corre risco de servir
+ * sessão de outra pessoa.
+ */
+export const currentUser = cache(async function currentUser(): Promise<SessionUser | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
+    // JOIN em vez de três queries em fila (session → user → client). É a
+    // consulta mais quente do sistema: roda em toda navegação.
+    relationLoadStrategy: "join",
     where: { token },
     include: { user: { include: { client: { select: { name: true } } } } },
   });
@@ -93,7 +104,7 @@ export async function currentUser(): Promise<SessionUser | null> {
     clientName: u.client?.name ?? null,
     mustChangePassword: u.mustChangePassword,
   };
-}
+});
 
 /* -------------------------------------------------------------------------- */
 /* Guardas de rota                                                             */

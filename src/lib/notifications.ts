@@ -68,61 +68,63 @@ export async function notificationsFor(user: SessionUser): Promise<Notification[
     return items.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
   }
 
-  if (user.permissions.includes("contas")) {
-    const contas = await prisma.account.findMany({
-      where: { OR: [{ hasPenalty: true }, { status: { in: ["EXPIRED", "ERROR"] } }] },
-      include: { client: { select: { name: true } } },
-      take: 20,
-    });
+  // As três listas são independentes: buscar em paralelo troca três idas ao
+  // banco em fila por uma só. Quem não tem a permissão nem consulta.
+  const [contas, atrasadas, threads] = await Promise.all([
+    user.permissions.includes("contas")
+      ? prisma.account.findMany({
+          where: { OR: [{ hasPenalty: true }, { status: { in: ["EXPIRED", "ERROR"] } }] },
+          include: { client: { select: { name: true } } },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    user.permissions.includes("mensalidades")
+      ? prisma.invoice.findMany({
+          where: { status: "ATRASADO" },
+          include: { client: { select: { id: true, name: true } } },
+          orderBy: { dueDate: "asc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    user.permissions.includes("suporte")
+      ? prisma.thread.findMany({
+          where: { unread: { gt: 0 } },
+          include: { client: { select: { name: true } } },
+          orderBy: { updatedAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+  ]);
 
-    for (const a of contas) {
-      const quebrada = a.status === "EXPIRED" || a.status === "ERROR";
-      items.push({
-        id: `conta-${a.id}`,
-        title: a.hasPenalty ? `${a.shopName} com penalidade` : `${a.shopName} precisa reconectar`,
-        detail: a.hasPenalty ? (a.penaltyNote ?? a.client.name) : (a.statusNote ?? a.client.name),
-        href: quebrada ? "/configuracoes" : `/contas?conta=${a.id}`,
-        severity: "CRITICO",
-      });
-    }
+  for (const a of contas) {
+    const quebrada = a.status === "EXPIRED" || a.status === "ERROR";
+    items.push({
+      id: `conta-${a.id}`,
+      title: a.hasPenalty ? `${a.shopName} com penalidade` : `${a.shopName} precisa reconectar`,
+      detail: a.hasPenalty ? (a.penaltyNote ?? a.client.name) : (a.statusNote ?? a.client.name),
+      href: quebrada ? "/configuracoes" : `/contas?conta=${a.id}`,
+      severity: "CRITICO",
+    });
   }
 
-  if (user.permissions.includes("mensalidades")) {
-    const atrasadas = await prisma.invoice.findMany({
-      where: { status: "ATRASADO" },
-      include: { client: { select: { id: true, name: true } } },
-      orderBy: { dueDate: "asc" },
-      take: 20,
+  for (const f of atrasadas) {
+    items.push({
+      id: `fat-${f.id}`,
+      title: `${f.client.name} — mensalidade atrasada`,
+      detail: `${brl(f.amount)} · venceu ${date(f.dueDate)}`,
+      href: `/mensalidades/${f.client.id}`,
+      severity: "CRITICO",
     });
-
-    for (const f of atrasadas) {
-      items.push({
-        id: `fat-${f.id}`,
-        title: `${f.client.name} — mensalidade atrasada`,
-        detail: `${brl(f.amount)} · venceu ${date(f.dueDate)}`,
-        href: `/mensalidades/${f.client.id}`,
-        severity: "CRITICO",
-      });
-    }
   }
 
-  if (user.permissions.includes("suporte")) {
-    const threads = await prisma.thread.findMany({
-      where: { unread: { gt: 0 } },
-      include: { client: { select: { name: true } } },
-      orderBy: { updatedAt: "desc" },
-      take: 20,
+  for (const t of threads) {
+    items.push({
+      id: `thread-${t.id}`,
+      title: `${t.client.name} aguardando resposta`,
+      detail: `${t.unread} mensagem(ns) não lida(s)`,
+      href: `/suporte?conversa=${t.id}`,
+      severity: "ATENCAO",
     });
-
-    for (const t of threads) {
-      items.push({
-        id: `thread-${t.id}`,
-        title: `${t.client.name} aguardando resposta`,
-        detail: `${t.unread} mensagem(ns) não lida(s)`,
-        href: `/suporte?conversa=${t.id}`,
-        severity: "ATENCAO",
-      });
-    }
   }
 
   return items.sort((a, b) => RANK[a.severity] - RANK[b.severity]);

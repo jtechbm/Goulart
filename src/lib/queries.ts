@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "./db";
 import { variation } from "./format";
 
@@ -60,13 +61,21 @@ export type AccountRollup = {
 /**
  * Faturamento por conta na janela atual e na anterior (para a variação).
  * `clientId` restringe ao portal do lojista — sem ele, é a carteira toda.
+ *
+ * Em `cache()` porque o Painel chama isto duas vezes na mesma renderização
+ * (via portfolioSummary e via criticalAlerts) com os mesmos argumentos — sem
+ * o cache o agregado pesado roda duplicado. O cache vive só na requisição.
  */
-export async function accountRollups(days = WINDOW_DAYS, clientId?: string): Promise<AccountRollup[]> {
+export const accountRollups = cache(async function accountRollups(
+  days = WINDOW_DAYS,
+  clientId?: string,
+): Promise<AccountRollup[]> {
   const { to, from, prevFrom } = windows(days);
   const scope = clientId ? { clientId } : {};
 
   const [accounts, current, previous] = await Promise.all([
     prisma.account.findMany({
+      relationLoadStrategy: "join",
       where: scope,
       include: { client: { select: { id: true, name: true } } },
       orderBy: { shopName: "asc" },
@@ -110,7 +119,7 @@ export async function accountRollups(days = WINDOW_DAYS, clientId?: string): Pro
       lastSyncAt: a.lastSyncAt,
     };
   });
-}
+});
 
 /** Saúde de uma conta, derivada dos números — não é campo manual. */
 export function healthOf(a: Pick<AccountRollup, "variation" | "hasPenalty" | "status">) {
@@ -128,8 +137,9 @@ export function healthOfClient(accounts: AccountRollup[]) {
 }
 
 export async function portfolioSummary(days = WINDOW_DAYS) {
-  const rollups = await accountRollups(days);
-  const [clients, byPlatform] = await Promise.all([
+  // As três são independentes — em série viravam duas idas ao banco em fila.
+  const [rollups, clients, byPlatform] = await Promise.all([
+    accountRollups(days),
     prisma.client.count(),
     prisma.account.groupBy({ by: ["platform"], _count: { _all: true } }),
   ]);

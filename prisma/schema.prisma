@@ -2,6 +2,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Permite `relationLoadStrategy: "join"`: sem isso o Prisma resolve cada
+  // include aninhado numa query separada e sequencial — caro quando o banco
+  // não está ao lado da aplicação.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
