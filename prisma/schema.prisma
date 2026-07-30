@@ -245,9 +245,15 @@ model StockMovement {
   @@index([productId, createdAt])
 }
 
-/// Comparação manual do preço de um produto do cliente com um concorrente na
-/// MESMA plataforma. Sem integração ainda — o Kadu digita o que encontrou.
-/// Acesso restrito a ele (ver `requireKadu` em src/lib/auth.ts): é ferramenta
+/// Preço de um concorrente encontrado para um produto do cliente, na MESMA
+/// plataforma. Usado por Shopee e TikTok Shop, que não têm API pública de
+/// busca — os dados vêm de busca na web e são ESTIMATIVA, ao contrário do
+/// Mercado Livre, cujo preço vem exato da API oficial.
+///
+/// Persistido em vez de consultado a cada abertura de tela por dois motivos:
+/// a busca leva ~26s (não cabe numa renderização) e cada uma custa dinheiro.
+///
+/// Acesso restrito ao Kadu (ver `requireKadu` em src/lib/auth.ts): é ferramenta
 /// de precificação da agência, não faz sentido para clientes nem pra equipe.
 model MarketComparison {
   id        String  @id @default(cuid())
@@ -263,6 +269,10 @@ model MarketComparison {
   competitorPrice  Float
   competitorUrl    String?
   note             String?
+
+  /// Trecho da página de onde o preço foi lido. Guardado para auditoria: dá
+  /// para conferir depois de onde saiu cada número.
+  sourceExcerpt String?
 
   authorId   String?
   authorName String

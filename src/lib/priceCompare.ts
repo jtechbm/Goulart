@@ -15,6 +15,8 @@ export type CompetitorProduct = {
   soldCount?: number | null;
   imageUrl?: string | null;
   url?: string | null;
+  /** Trecho da fonte de onde o preço foi lido — só quando veio de busca web. */
+  sourceExcerpt?: string | null;
 };
 
 export type PriceAnalysis = {
