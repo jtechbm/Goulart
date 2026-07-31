@@ -116,10 +116,30 @@ export class IntegrationError extends Error {
   }
 }
 
+/**
+ * URL pública da aplicação, usada para montar o `redirect_uri` do OAuth.
+ *
+ * `APP_URL` manda quando existe, porque o endereço precisa bater EXATAMENTE
+ * com o que está cadastrado em cada plataforma. Sem ela, cai no domínio de
+ * produção que a própria Vercel injeta — antes o app simplesmente quebrava
+ * quando alguém esquecia de configurar a variável.
+ *
+ * Preferimos `VERCEL_PROJECT_PRODUCTION_URL` a `VERCEL_URL`: esta última muda
+ * a cada deploy (inclui um hash), e um redirect_uri diferente do cadastrado é
+ * recusado pela plataforma.
+ */
 export function appUrl(): string {
-  const url = process.env.APP_URL;
-  if (!url) throw new Error("APP_URL não definida no .env");
-  return url.replace(/\/$/, "");
+  const explicita = process.env.APP_URL?.trim();
+  if (explicita) return explicita.replace(/\/$/, "");
+
+  const daVercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || process.env.VERCEL_URL?.trim();
+  if (daVercel) return `https://${daVercel.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
+
+  throw new Error(
+    "APP_URL não definida. Configure-a com a URL pública da aplicação " +
+      "(ex.: https://goulart.vercel.app) — precisa ser idêntica ao redirect URI " +
+      "cadastrado na plataforma.",
+  );
 }
 
 export function redirectUri(slug: string): string {
