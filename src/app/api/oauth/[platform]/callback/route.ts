@@ -52,6 +52,35 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
   try {
     const tokens = await adapter.exchangeCode({ params, verifier: saved.verifier });
 
+    /**
+     * Antes: o upsert reatribuía `clientId` silenciosamente. Reconectar uma
+     * loja com o cliente errado selecionado a transferia de dono — e como
+     * pedidos, métricas e produtos penduram em `accountId`, o histórico inteiro
+     * ia junto. O portal do novo dono passaria a exibir o faturamento do
+     * anterior, sem erro e sem aviso.
+     *
+     * Agora a troca de dono exige ação explícita: aqui a reconexão só renova os
+     * tokens da loja onde ela já está.
+     */
+    const existente = await prisma.account.findUnique({
+      where: { platform_externalId: { platform: adapter.platform, externalId: tokens.externalId } },
+      include: { client: { select: { name: true } } },
+    });
+
+    if (existente && existente.clientId !== saved.clientId) {
+      const destino = await prisma.client.findUnique({
+        where: { id: saved.clientId },
+        select: { name: true },
+      });
+      return back(
+        `Esta loja já está conectada em "${existente.client.name}". Para movê-la para ` +
+          `"${destino?.name ?? "outro cliente"}", desconecte-a primeiro — a transferência ` +
+          `levaria junto todo o histórico de pedidos e faturamento.`,
+        false,
+        role,
+      );
+    }
+
     const account = await prisma.account.upsert({
       where: { platform_externalId: { platform: adapter.platform, externalId: tokens.externalId } },
       create: {
@@ -63,7 +92,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
         status: "PENDING",
       },
       update: {
-        clientId: saved.clientId,
+        // `clientId` fora de propósito: reconectar renova credencial, não muda dono.
         shopName: tokens.shopName ?? undefined,
         region: tokens.region ?? undefined,
       },
