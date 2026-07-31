@@ -62,6 +62,14 @@ export default async function PortalIntegracoesPage({
     orderBy: [{ platform: "asc" }, { shopName: "asc" }],
   });
 
+  /**
+   * Só entram as plataformas cujas credenciais existem. Um card que só sabe
+   * dizer "indisponível" ocupa espaço e convida o lojista a tentar algo que
+   * não vai funcionar. Quando as chaves da Shopee/TikTok forem configuradas,
+   * os cards voltam sozinhos — não é preciso mexer aqui de novo.
+   */
+  const disponiveis = PLATFORMS.filter((p) => adapters[p].isConfigured());
+
   return (
     <>
       <Topbar crumb="Integrações" />
@@ -145,11 +153,20 @@ export default async function PortalIntegracoesPage({
           </Card>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {PLATFORMS.map((platform) => {
+        {disponiveis.length === 0 ? (
+          <Card>
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm font-medium text-ink">Nenhum marketplace disponível no momento</p>
+              <p className="mx-auto mt-1 max-w-md text-[13px] text-ink-muted">
+                Assim que a integração estiver liberada, ela aparece aqui. Fale com seu gestor.
+              </p>
+            </div>
+          </Card>
+        ) : (
+        <div className={`grid gap-6 ${disponiveis.length > 1 ? "lg:grid-cols-3" : "max-w-xl"}`}>
+          {disponiveis.map((platform) => {
             const guide = GUIDE[platform];
             const slug = PLATFORM_SLUG[platform];
-            const configured = adapters[platform].isConfigured();
             const conectada = accounts.some((a) => a.platform === platform && a.status === "CONNECTED");
 
             return (
@@ -180,22 +197,17 @@ export default async function PortalIntegracoesPage({
                   <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-[12px] text-ink-muted">{guide.note}</p>
                 )}
 
-                {configured ? (
-                  <a
-                    href={`/api/oauth/${slug}/start`}
-                    className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover"
-                  >
-                    <Plug size={15} /> Conectar {PLATFORM_LABEL[platform]}
-                  </a>
-                ) : (
-                  <p className="mt-4 rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-center text-[13px] text-ink-muted">
-                    Indisponível no momento — fale com seu gestor.
-                  </p>
-                )}
+                <a
+                  href={`/api/oauth/${slug}/start`}
+                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover"
+                >
+                  <Plug size={15} /> Conectar {PLATFORM_LABEL[platform]}
+                </a>
               </Card>
             );
           })}
         </div>
+        )}
 
         <p className="mt-6 text-[13px] text-ink-muted">
           Travou em algum passo? Chame no{" "}
