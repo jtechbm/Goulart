@@ -1,5 +1,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { ReactNode } from "react";
+import { APP_NAME } from "@/lib/brand";
+import { CANAL_COR, CANAL_LABEL, CANAL_SHORT, type Canal } from "@/lib/canais";
 import { pct } from "@/lib/format";
 
 export function Card({
@@ -40,31 +42,38 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
   );
 }
 
+/**
+ * Cabeçalho só de impressão — a tela nunca mostra, o PDF sempre. O título já
+ * sai do `PageHeader` normal (que não se esconde no print); aqui só entra o
+ * que falta pra identificar o documento: de quem é e quando foi gerado.
+ */
+export function PrintHeader({ empresa, periodo }: { empresa: string; periodo: string }) {
+  return (
+    <div className="mb-4 hidden border-b border-line pb-3 print:block">
+      <p className="text-base font-bold text-ink">{empresa || APP_NAME}</p>
+      <p className="text-[13px] text-ink-2">
+        {periodo} · gerado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date())}
+      </p>
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
-/* Marketplaces                                                                */
+/* Canais de venda                                                             */
 /* -------------------------------------------------------------------------- */
 
-const PLATFORM_STYLE = {
-  MERCADO_LIVRE: { label: "Mercado Livre", short: "ML", fg: "var(--ml)", bg: "var(--ml-bg)" },
-  SHOPEE: { label: "Shopee", short: "Shopee", fg: "var(--shopee)", bg: "var(--shopee-bg)" },
-  TIKTOK_SHOP: { label: "TikTok Shop", short: "TikTok", fg: "var(--tiktok)", bg: "var(--tiktok-bg)" },
-} as const;
-
-export type PlatformKey = keyof typeof PLATFORM_STYLE;
+export type PlatformKey = Canal;
 
 export function PlatformBadge({ platform, short = false }: { platform: string; short?: boolean }) {
-  const s = PLATFORM_STYLE[platform as PlatformKey] ?? {
-    label: platform,
-    short: platform,
-    fg: "var(--ink-2)",
-    bg: "var(--surface-3)",
-  };
+  const cor = CANAL_COR[platform as Canal] ?? { fg: "var(--ink-2)", bg: "var(--surface-3)" };
+  const label = CANAL_LABEL[platform as Canal] ?? platform;
+  const shortLabel = CANAL_SHORT[platform as Canal] ?? platform;
   return (
     <span
       className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-      style={{ color: s.fg, backgroundColor: s.bg }}
+      style={{ color: cor.fg, backgroundColor: cor.bg }}
     >
-      {short ? s.short : s.label}
+      {short ? shortLabel : label}
     </span>
   );
 }
@@ -108,14 +117,17 @@ export function Stat({
   hint?: string;
   delta?: number;
   icon?: ReactNode;
-  tone?: "brand" | "series-1" | "series-2" | "series-3" | "good";
+  tone?: "brand" | "series-1" | "series-2" | "series-3" | "series-4" | "series-5" | "good" | "critical";
 }) {
   const toneColor = {
     brand: "var(--brand)",
     "series-1": "var(--series-1)",
     "series-2": "var(--series-2)",
     "series-3": "var(--series-3)",
+    "series-4": "var(--series-4)",
+    "series-5": "var(--series-5)",
     good: "var(--good)",
+    critical: "var(--critical)",
   }[tone];
 
   return (

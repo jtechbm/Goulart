@@ -1,10 +1,13 @@
-import { CircleAlert, CircleCheck, Plug, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, Clock, Plug, RefreshCw, ShieldCheck, Store, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
 import { Card, CardHeader, PageHeader, PlatformBadge } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { relative } from "@/lib/format";
 import { adapters, PLATFORM_LABEL, PLATFORM_SLUG, PLATFORMS, type Platform } from "@/lib/integrations";
+
+const TEM_ADAPTER = new Set<string>(PLATFORMS);
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +128,7 @@ export default async function IntegracoesPage({
             <ul className="divide-y divide-[var(--border)]">
               {accounts.map((a) => {
                 const s = STATUS[a.status as keyof typeof STATUS] ?? STATUS.PENDING;
-                const slug = PLATFORM_SLUG[a.platform as Platform];
+                const temAdapter = TEM_ADAPTER.has(a.platform);
                 return (
                   <li key={a.id} className="flex flex-wrap items-center gap-4 px-5 py-4">
                     <PlatformBadge platform={a.platform} />
@@ -140,12 +143,18 @@ export default async function IntegracoesPage({
                       <s.Icon size={13} aria-hidden />
                       {s.label}
                     </span>
-                    <a
-                      href={`/api/oauth/${slug}/start`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
-                    >
-                      <RefreshCw size={13} /> Reconectar
-                    </a>
+                    {temAdapter ? (
+                      <a
+                        href={`/api/oauth/${PLATFORM_SLUG[a.platform as Platform]}/start`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+                      >
+                        <RefreshCw size={13} /> Reconectar
+                      </a>
+                    ) : (
+                      <span className="text-[12px] text-ink-muted">
+                        {a.platform === "ATACADO" ? "canal interno, sem OAuth" : "integração automática em breve"}
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -209,6 +218,46 @@ export default async function IntegracoesPage({
           })}
         </div>
         )}
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <Card className="flex flex-col p-5">
+            <div className="flex items-center gap-2">
+              <PlatformBadge platform="SHEIN" />
+              <span className="inline-flex items-center gap-1 text-[12px] font-medium text-ink-muted">
+                <Clock size={12} /> em breve
+              </span>
+            </div>
+            <p className="mt-3 flex-1 text-[13px] text-ink-2">
+              A integração automática com a SHEIN ainda não está disponível — quando abrir, a autorização funciona
+              igual à dos outros marketplaces. Os números que você vê hoje em Faturamento e Relatórios são de
+              demonstração.
+            </p>
+            <button
+              type="button"
+              disabled
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink-muted opacity-60"
+            >
+              <Plug size={15} /> Em breve
+            </button>
+          </Card>
+
+          <Card className="flex flex-col p-5">
+            <div className="flex items-center gap-2">
+              <PlatformBadge platform="ATACADO" />
+              <span className="text-[12px] font-medium text-ink-muted">canal interno</span>
+            </div>
+            <p className="mt-3 flex-1 text-[13px] text-ink-2">
+              O Atacado não é um marketplace — é o canal de vendas por fora, direto para seus clientes. Não precisa de
+              OAuth: você cadastra o cliente e o pedido, e o estoque sai do mesmo lugar de sempre.
+            </p>
+            <Link
+              href="/atacado"
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover"
+            >
+              <Store size={15} /> Ir para o Atacado
+            </Link>
+          </Card>
+        </div>
       </main>
     </>
   );

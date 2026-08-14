@@ -1,6 +1,8 @@
+import { CANAIS, type Canal } from "./canais";
 import { prisma } from "./db";
+import { despesasPorCategoria } from "./finance";
 import { calcularLinha, somar, type Resultado } from "./sales";
-import { TAX_RATE } from "./queries";
+import { configuracoes } from "./settings";
 
 /**
  * Relatório de faturamento e lucro do período.
@@ -70,6 +72,7 @@ export type Relatorio = {
 export async function gerarRelatorio(clientId: string, dias: number): Promise<Relatorio> {
   const ate = new Date();
   const de = new Date(ate.getTime() - dias * 86400000);
+  const config = await configuracoes(clientId);
 
   const pedidos = await prisma.order.findMany({
     where: { account: { clientId }, placedAt: { gte: de, lte: ate } },
@@ -98,7 +101,7 @@ export async function gerarRelatorio(clientId: string, dias: number): Promise<Re
     daPlataforma.pedidos += 1;
 
     for (const item of p.items) {
-      const r = calcularLinha(item);
+      const r = calcularLinha(item, config.taxRate);
       todas.push(r);
       taxasDosItens += item.fees;
       unidades += item.quantity;
@@ -142,7 +145,7 @@ export async function gerarRelatorio(clientId: string, dias: number): Promise<Re
     custoExtra: t.custoExtra,
     lucro: t.lucro,
     margem: t.margem,
-    aliquota: TAX_RATE,
+    aliquota: config.taxRate,
     pedidos: pedidos.length,
     unidades,
     ticket: pedidos.length ? t.total / pedidos.length : 0,
@@ -157,5 +160,114 @@ export async function gerarRelatorio(clientId: string, dias: number): Promise<Re
       }))
       .sort((a, b) => b.faturamento - a.faturamento),
     porProduto: [...produtos.values()].sort((a, b) => b.lucro - a.lucro),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Analítico — faturamento por canal até lucro operacional                    */
+/* -------------------------------------------------------------------------- */
+
+export type Analitico = {
+  de: Date;
+  ate: Date;
+  porCanal: Array<{ canal: Canal; faturamento: number }>;
+  faturamentoTotal: number;
+  liquidoMarketplace: number;
+  liquidoAtacado: number;
+  liquidoTotal: number;
+  custoProduto: number;
+  custoExtra: number;
+  lucroBruto: number;
+  margemBruta: number;
+  imposto: number;
+  aliquota: number;
+  despesasOperacionais: number;
+  porCategoriaDespesa: Array<{ categoria: string; label: string; valor: number }>;
+  ads: number;
+  lucroOperacional: number;
+  margemOperacional: number;
+  pedidos: number;
+};
+
+/**
+ * O mesmo cascata da tela de Vendas, mas separando marketplace de atacado —
+ * o atacado sai sozinho porque é só mais uma `Account` (`platform: "ATACADO"`),
+ * nunca um código especial. Lucro bruto é receita menos CMV; lucro
+ * operacional desconta imposto, despesas (financeiro) e ADS por cima disso.
+ */
+export async function gerarAnalitico(clientId: string, dias: number): Promise<Analitico> {
+  const ate = new Date();
+  const de = new Date(ate.getTime() - dias * 86400000);
+  const config = await configuracoes(clientId);
+
+  const pedidos = await prisma.order.findMany({
+    where: { account: { clientId }, placedAt: { gte: de, lte: ate } },
+    include: {
+      account: { select: { platform: true } },
+      items: { include: { product: { select: { cost: true, extraCost: true } } } },
+    },
+  });
+
+  const porCanalMap = new Map<string, number>();
+  let custoProduto = 0,
+    custoExtra = 0,
+    impostoTotal = 0,
+    liquidoMarketplace = 0,
+    liquidoAtacado = 0;
+
+  for (const p of pedidos) {
+    const canal = p.account.platform;
+    const isAtacado = canal === "ATACADO";
+    let faturamentoPedido = 0;
+    for (const item of p.items) {
+      const r = calcularLinha(item, config.taxRate);
+      faturamentoPedido += r.total;
+      custoProduto += r.custoProduto;
+      custoExtra += r.custoExtra;
+      impostoTotal += r.imposto;
+      if (isAtacado) liquidoAtacado += r.liquido;
+      else liquidoMarketplace += r.liquido;
+    }
+    porCanalMap.set(canal, (porCanalMap.get(canal) ?? 0) + faturamentoPedido);
+  }
+
+  const faturamentoTotal = [...porCanalMap.values()].reduce((s, v) => s + v, 0);
+  const liquidoTotal = liquidoMarketplace + liquidoAtacado;
+  const lucroBruto = liquidoTotal - custoProduto - custoExtra;
+
+  const [adsAgg, despesasBrutas] = await Promise.all([
+    prisma.dailyMetric.aggregate({
+      where: { day: { gte: de, lte: ate }, account: { clientId } },
+      _sum: { adsSpend: true },
+    }),
+    despesasPorCategoria(clientId, de, ate),
+  ]);
+  const ads = adsAgg._sum.adsSpend ?? 0;
+  // ADS e Imposto saem em linha própria — contá-los de novo aqui duplicaria.
+  const porCategoriaDespesa = despesasBrutas.filter((d) => d.categoria !== "ADS" && d.categoria !== "IMPOSTO");
+  const despesasOperacionais = porCategoriaDespesa.reduce((s, d) => s + d.valor, 0);
+
+  const lucroOperacional = lucroBruto - impostoTotal - despesasOperacionais - ads;
+
+  return {
+    de,
+    ate,
+    porCanal: CANAIS.filter((c) => (porCanalMap.get(c) ?? 0) > 0).map((c) => ({ canal: c, faturamento: porCanalMap.get(c)! })),
+    faturamentoTotal,
+    liquidoMarketplace,
+    liquidoAtacado,
+    liquidoTotal,
+    custoProduto,
+    custoExtra,
+    lucroBruto,
+    margemBruta: faturamentoTotal ? (lucroBruto / faturamentoTotal) * 100 : 0,
+    imposto: impostoTotal,
+    aliquota: config.taxRate,
+    despesasOperacionais,
+    porCategoriaDespesa,
+    ads,
+    lucroOperacional,
+    margemOperacional: faturamentoTotal ? (lucroOperacional / faturamentoTotal) * 100 : 0,
+    pedidos: pedidos.length,
   };
 }

@@ -3,6 +3,7 @@ import { CostDonut, MarginBars, RevenueLine } from "@/components/charts";
 import { Topbar } from "@/components/Topbar";
 import { Card, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
+import { CANAIS } from "@/lib/canais";
 import { brl, num } from "@/lib/format";
 import { accountRollups, financials, revenueSeries, TAX_RATE, WINDOW_DAYS } from "@/lib/queries";
 
@@ -18,7 +19,7 @@ export default async function FaturamentoPage() {
 
   const f = financials(rollups);
 
-  const byPlatform = ["MERCADO_LIVRE", "SHOPEE", "TIKTOK_SHOP"]
+  const byPlatform = CANAIS
     .map((p) => {
       const scoped = rollups.filter((r) => r.platform === p);
       const g = financials(scoped);
@@ -89,7 +90,7 @@ export default async function FaturamentoPage() {
 
         <Card className="mt-6 p-5">
           <div className="mb-4">
-            <h2 className="text-[15px] font-semibold text-ink">Receita diária por marketplace</h2>
+            <h2 className="text-[15px] font-semibold text-ink">Receita diária por canal</h2>
             <p className="mt-0.5 text-[13px] text-ink-muted">Últimos {WINDOW_DAYS} dias.</p>
           </div>
           <RevenueLine data={series} />
@@ -103,12 +104,18 @@ export default async function FaturamentoPage() {
                 Comissões de {brl(f.fees)} já descontadas do lucro.
               </p>
             </div>
-            <CostDonut profit={f.profit} tax={f.tax} ads={f.ads} />
+            <CostDonut
+              fatias={[
+                { label: "Lucro líquido", value: f.profit },
+                { label: "Imposto", value: f.tax },
+                { label: "ADS", value: f.ads },
+              ]}
+            />
           </Card>
 
           <Card className="p-5">
             <div className="mb-4">
-              <h2 className="text-[15px] font-semibold text-ink">Margem por marketplace</h2>
+              <h2 className="text-[15px] font-semibold text-ink">Margem por canal</h2>
               <p className="mt-0.5 text-[13px] text-ink-muted">Lucro líquido sobre a receita de cada canal.</p>
             </div>
             <MarginBars data={byPlatform} />

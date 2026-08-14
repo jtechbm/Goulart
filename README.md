@@ -1,13 +1,20 @@
 # ArtSul Decorações
 
-Sistema de gestão multi-marketplace do lojista: **Mercado Livre**, **Shopee** e
-**TikTok Shop** em um lugar só — faturamento, lojas conectadas, estoque (que o próprio
-lojista movimenta) e as integrações self-service.
+SaaS completo do lojista que vende em marketplace **e** no atacado: **Mercado Livre**,
+**Shopee**, **TikTok Shop** e **SHEIN** de um lado, vendas por fora do outro — faturamento,
+estoque compartilhado entre os dois, financeiro, chat unificado, gerenciamento de
+clientes/fornecedores e relatórios, tudo num lugar só.
 
 Há **um único tipo de usuário**: a pessoa da loja. Tudo que ela vê é escopado pelo
 `clientId` da sessão.
 
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind v4 · Prisma · Postgres.
+
+> **MVP de demonstração.** Mercado Livre, Shopee e TikTok Shop têm integração OAuth real
+> (ver [Conectando cada marketplace](#conectando-cada-marketplace)); SHEIN e o financeiro
+> "repasse de marketplace" são fictícios — não existe adapter de SHEIN nem API de repasse
+> conectada. O que dá pra testar de ponta a ponta, com dado de verdade no banco, é semeado
+> pelo `npm run dados-demo` (ver [Dados de demonstração](#dados-de-demonstração)).
 
 ---
 
@@ -43,6 +50,24 @@ O script reaproveita a empresa se ela já existir (duas pessoas da mesma loja pr
 apontar para o mesmo `clientId`), sorteia a senha e a imprime **uma única vez** — copie e
 envie. Com `--senha` você define uma. Não há tela obrigatória de troca no primeiro acesso:
 a pessoa entra direto e troca quando quiser, pelo ícone de chave no topo.
+
+### Dados de demonstração
+
+```bash
+npm run dados-demo -- --loja "Nome da Empresa"
+npm run dados-demo -- --loja "Nome da Empresa" --limpar
+```
+
+Popula a empresa (que precisa já existir — rode `criar-acesso` antes) com ~90 dias de
+histórico: 4 contas de marketplace + a conta interna de Atacado, ~30 produtos (parte deles
+também no catálogo de atacado), ~120 pedidos de marketplace e ~18 de atacado, clientes e
+fornecedores, lançamentos financeiros (alguns pagos, alguns vencidos de propósito) e 14
+conversas de chat com mensagem não lida. Idempotente — roda de novo sem duplicar — e
+`--limpar` desfaz tudo daquela empresa (contas com `externalId` prefixado por `demo-`, mais
+todo `Customer`/`FinanceEntry`/`Conversation`/`Settings` do cliente).
+
+Separado do `dados-exemplo` original (que continua existindo, mais enxuto: só um Mercado
+Livre com 5 produtos e 6 pedidos).
 
 ---
 
@@ -142,6 +167,17 @@ O TikTok não aceita `redirect_uri` na query — ele usa o Callback URL cadastra
 Após autorizar, o sistema busca o `shop_cipher` da loja (obrigatório em todas as chamadas
 seguintes) e o revalida a cada refresh.
 
+### SHEIN e Atacado — não são OAuth
+
+Nem todo canal em `src/lib/canais.ts` tem adapter. **SHEIN** aparece em filtros, gráficos,
+relatórios e chat com dado fictício, mas não tem integração automática — o card em
+Integrações mostra "em breve", sem botão de conectar. **Atacado** nunca vai ter OAuth: é
+canal interno, uma `Account` sintética (`platform: "ATACADO"`) criada sob demanda por
+`contaAtacado()` em `src/lib/wholesale.ts`. Adicionar um adapter de verdade para a SHEIN é
+o mesmo caminho de Shopee/TikTok: implementar `MarketplaceAdapter`, registrar em
+`integrations/index.ts` e trocar `PLATFORMS`/`adapters` — os cards e o card "em breve"
+saem sozinhos.
+
 ---
 
 ## Comparador de preços
@@ -203,6 +239,51 @@ Na Vercel, agende com `vercel.json`:
 
 ---
 
+## Atacado, Financeiro, Chat e Gerenciamento
+
+### Atacado — o quinto canal
+
+O atacado **não é um módulo isolado**: é mais um canal, uma `Account` sintética com
+`platform: "ATACADO"` (uma por cliente, `contaAtacado()` cria sob demanda). Isso é
+deliberado — `accountRollups`, `revenueSeries`, o relatório por plataforma e os gráficos já
+sabem lidar com contas, então o atacado aparece em Faturamento/Relatórios sem nenhum código
+especial para ele.
+
+Também não duplica produto: `Product.wholesalePrice` marca um produto **já existente** (de
+qualquer marketplace) como vendável no atacado — "importar" é só preencher esse preço.
+Produtos exclusivos do atacado nascem `origin: MANUAL` na conta ATACADO. Um pedido de
+atacado baixa estoque pelo mesmo `moveStock()` de `/estoque` (ledger incluso) e recompõe o
+`DailyMetric` do dia a partir do próprio pedido — nunca inventa número solto, senão
+Faturamento discordaria de Vendas. Tudo isso em `src/lib/wholesale.ts`.
+
+### Financeiro
+
+`FinanceEntry` cobre a receber, a pagar, despesas e repasses de marketplace. O status
+(pago/pendente/atrasado) **nunca é gravado** — `statusDe()` em `src/lib/finance.ts` deriva
+de `paidAt`/`dueDate` na leitura, porque um status salvo no banco envelhece sozinho e passa
+a mentir assim que a data vence.
+
+### Chat
+
+Conversas fictícias por enquanto (`Conversation`/`Message`), uma por plataforma, com
+resposta automática ~1,8s depois do envio (`src/lib/chat.ts` + `chatActions.ts`) — dá pra
+demonstrar ao vivo sem depender de API de mensageria nenhuma.
+
+### Gerenciamento
+
+`Customer` serve clientes **e** fornecedores (`kind`) — mesma tabela, mesmos campos,
+telas separadas por aba. `Order.customerId` liga o pedido de atacado a quem comprou.
+
+### Alíquota e limite de estoque vêm de Configurações
+
+`Settings` guarda alíquota, custo extra padrão e limite de estoque baixo por cliente.
+`TAX_RATE`/`LOW_STOCK` continuam existindo como **fallback** em `queries.ts`/`inventory.ts`
+— a linha de `Settings` só nasce quando alguém salva algo em `/configuracoes`
+(`configuracoes()` nunca cria implicitamente). `gerarRelatorio`, `gerarAnalitico`, Vendas e
+o pedido de atacado já leem daqui.
+
+---
+
 ## Estrutura
 
 ```
@@ -213,28 +294,42 @@ src/
 │   ├── trocar-senha/         troca voluntária de senha
 │   ├── (app)/                O SISTEMA — guard no layout do grupo
 │   │   ├── page.tsx          Início
-│   │   ├── vendas/           lucro e margem item a item
+│   │   ├── vendas/           lucro e margem item a item (marketplace)
+│   │   ├── atacado/          pedidos, catálogo e novo pedido de atacado
+│   │   ├── chat/             conversas de todas as plataformas
+│   │   ├── comparador/       comparador de preços
 │   │   ├── faturamento/      receita, custos e margem
-│   │   ├── lojas/            desempenho por loja + sync manual
+│   │   ├── financeiro/       caixa, a receber/pagar e repasses
+│   │   ├── relatorios/       analítico, faturamento, produtos, estoque, financeiro
 │   │   ├── estoque/          movimentação, custos e ledger
-│   │   └── integracoes/      conectar/reconectar marketplaces
+│   │   ├── lojas/            desempenho por loja + sync manual
+│   │   ├── gerenciamento/    clientes e fornecedores
+│   │   ├── integracoes/      conectar/reconectar marketplaces
+│   │   └── configuracoes/    empresa, fiscal, aparência, notificações
 │   └── api/
 │       ├── oauth/[platform]/start     inicia o OAuth (state + PKCE)
 │       ├── oauth/[platform]/callback  troca o code por tokens
 │       └── sync                       dispara a sincronização
-├── components/               shell, gráficos e primitivos de UI
+├── components/               shell, gráficos, ChatThread e primitivos de UI
 └── lib/
     ├── integrations/         um adapter por marketplace, atrás de uma interface só
+    ├── canais.ts             fonte única dos 5 canais (label, cor, slot de série)
     ├── brand.ts              nome e logo do produto (ponto único)
     ├── auth.ts / password.ts sessão, guards e hashing (separados de propósito:
     │                         os scripts importam o hashing sem arrastar `next/headers`)
     ├── crypto.ts             AES-256-GCM, HMAC, PKCE
     ├── rateLimit.ts          limite de tentativas de login e de cadastro
     ├── sales.ts              a conta de lucro e margem por item (fonte única)
+    ├── wholesale.ts          conta ATACADO, catálogo de atacado, pedido de atacado
+    ├── finance.ts            lançamentos, status derivado, fluxo de caixa
+    ├── chat.ts / chatActions.ts  conversas e mensagens (+ resposta automática)
+    ├── customers.ts          clientes e fornecedores
+    ├── settings.ts           configurações por cliente (com fallback)
     ├── tokens.ts             refresh transparente
     ├── sync.ts               pedidos + agregado diário + catálogo/estoque
     ├── inventory.ts          entrada/saída de estoque com write-back e ledger
     ├── notifications.ts      o que alimenta o sino
+    ├── reports.ts            gerarRelatorio (faturamento) e gerarAnalitico
     └── queries.ts            agregações das telas (sempre escopadas por clientId)
 ```
 
@@ -246,6 +341,9 @@ Scripts:
 - `scripts/dados-exemplo.ts` — 6 pedidos e 5 produtos de Mercado Livre para dar o que ver
   nas telas. Cada caso cobre um estado: lucro, prejuízo por frete grátis, custo em branco e
   venda sem produto vinculado. `--limpar` remove.
+- `scripts/dados-demo.ts` — a demonstração completa: 4 marketplaces + atacado, ~90 dias de
+  histórico, financeiro e chat. Ver [Dados de demonstração](#dados-de-demonstração).
+  `--limpar` remove.
 - `scripts/dev-check-inventory.ts` — exercita entrada, saída, saldo negativo e o escopo
   por cliente do módulo de estoque. Só desenvolvimento.
 
@@ -269,8 +367,9 @@ custo deixa isso explícito na tela.
 **ADS.** `adsSpend` existe no schema e aparece em Faturamento, mas nenhuma das três APIs
 de Ads está conectada ainda; hoje o campo fica zerado.
 
-**Imposto.** O valor em Faturamento é uma estimativa pela alíquota em `TAX_RATE`
-(`src/lib/queries.ts`), não um cálculo fiscal.
+**Imposto.** O valor em Faturamento/Vendas/Relatórios é uma estimativa pela alíquota
+configurada em `/configuracoes` (fallback `TAX_RATE` em `src/lib/queries.ts` enquanto não
+há `Settings` salvo), não um cálculo fiscal.
 
 **Estoque.** O catálogo vem junto no sync (`fetchProducts`). O TikTok Shop não devolve
 quantidade vendida no endpoint de produtos, então `soldCount` fica zerado lá.
@@ -290,6 +389,9 @@ de senha por e-mail (hoje a senha provisória é gerada pelo script), 2FA, rate 
 tentativas de login, e log de auditoria. Coloque ao menos rate limit antes de abrir para a
 internet.
 
-**Cores dos gráficos.** A paleta categórica (violeta/laranja/aqua) foi validada para
-daltonismo e contraste nos temas claro e escuro. Trocar as cores sem revalidar quebra a
-acessibilidade — a ordem dos slots é o mecanismo de segurança, não decoração.
+**Cores dos gráficos.** A paleta categórica tem 5 slots fixos — violeta (Mercado Livre),
+laranja (Shopee), aqua (TikTok Shop), azul (SHEIN), vinho (Atacado) — validados para
+daltonismo e contraste nos temas claro e escuro com `dataviz/scripts/validate_palette.js`.
+Trocar as cores ou a ordem sem revalidar quebra a acessibilidade — a ordem dos slots é o
+mecanismo de segurança, não decoração. Um 6º canal exige revalidar o par novo contra os
+cinco existentes (`--pairs all`), não só escolher uma cor bonita.
