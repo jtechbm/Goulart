@@ -8,6 +8,13 @@ import { NotificationsFallback, NotificationsSlot } from "./NotificationsSlot";
 import { ThemeToggle } from "./ThemeToggle";
 import { Avatar } from "./ui";
 
+/** Nome da empresa, a não ser que ele apenas repita o nome de quem entrou. */
+function segundaLinha(nome: string, empresa: string | null, email: string): string {
+  if (!empresa) return email;
+  const normal = (s: string) => s.trim().toLowerCase();
+  return normal(empresa).startsWith(normal(nome)) ? email : empresa;
+}
+
 export async function Topbar({ crumb }: { crumb: string }) {
   // O layout do grupo (app) já garantiu a sessão antes de chegar aqui.
   // `currentUser` está em cache: aqui não custa consulta nova.
@@ -32,7 +39,12 @@ export async function Topbar({ crumb }: { crumb: string }) {
           <Avatar name={user.name} />
           <span className="hidden leading-tight sm:block">
             <span className="block text-sm font-semibold text-ink">{user.name}</span>
-            <span className="block text-xs text-ink-muted">{user.clientName ?? "Minha conta"}</span>
+            {/* Quando o nome de quem entrou já é o da empresa, repetir "ArtSul"
+                sobre "ArtSul Decorações" não informa nada — o e-mail sim, que
+                diz em qual acesso você está. */}
+            <span className="block text-xs text-ink-muted">
+              {segundaLinha(user.name, user.clientName, user.email)}
+            </span>
           </span>
 
           <Link

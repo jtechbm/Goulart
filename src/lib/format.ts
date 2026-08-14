@@ -1,9 +1,19 @@
+/**
+ * Dinheiro **sempre com centavos**.
+ *
+ * Arredondar para o real inteiro era aceitável enquanto as telas só mostravam
+ * totais, mas quebra onde há conta à vista: um lucro de R$ 4,95 virava "R$ 5",
+ * e uma cascata de subtrações passava a não fechar aos olhos de quem confere.
+ *
+ * `compact` continua abreviando ("R$ 12,3 mil") e existe só para eixo e rótulo
+ * de gráfico, onde o espaço é o limite e o número exato está na tabela ao lado.
+ */
 export const brl = (v: number, compact = false) =>
   new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     notation: compact ? "compact" : "standard",
-    maximumFractionDigits: compact ? 1 : 0,
+    ...(compact ? { maximumFractionDigits: 1 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   }).format(v);
 
 export const num = (v: number) => new Intl.NumberFormat("pt-BR").format(v);

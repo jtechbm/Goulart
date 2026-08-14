@@ -144,6 +144,37 @@ seguintes) e o revalida a cada refresh.
 
 ---
 
+## Comparador de preços
+
+Você escolhe um produto seu e o sistema busca os concorrentes **do mesmo produto, na mesma
+plataforma**. Nada é digitado à mão.
+
+**Mercado Livre** usa a API oficial: `/products/search` acha os produtos de catálogo pelo
+título e `/products/{id}/items` devolve todos os vendedores daquele produto com preço
+exato. É rápido (~5s) e roda ao abrir a tela.
+
+⚠️ **Limitação real, medida:** `/products/{id}/items` lista só quem disputa a Buy Box de um
+produto de catálogo. Em categorias onde os vendedores não publicam no catálogo — decoração,
+cama/mesa/banho, artesanato — ele devolve `404 No winners found` e não há o que comparar:
+
+| Busca | Catálogos | Com concorrentes | Ofertas |
+|---|---|---|---|
+| `iphone 15 128gb` | 10 | 6 | 190 |
+| `echo dot 5` | 10 | 3 | 16 |
+| `almofada decorativa veludo` | 10 | **0** | 0 |
+
+A alternativa seria `/sites/MLB/search`, a busca por palavra-chave que o comprador vê, mas
+o Mercado Livre a restringiu — responde **403** mesmo com token de aplicação válido. Quando
+não há concorrentes, a tela explica o porquê em vez de dizer só "não encontrado".
+
+**Shopee e TikTok Shop** não têm API pública de busca. Para elas existe um caminho por IA
+(`OPENAI_API_KEY`, Responses API com busca na web) que roda **por ação explícita**, nunca ao
+abrir a tela: leva ~26s e cada busca custa dinheiro. O resultado fica gravado em
+`MarketComparison` e é sempre rotulado como **estimativa** — cada preço é conferido contra o
+trecho da página de onde foi lido, e o que não bate é descartado.
+
+---
+
 ## Sincronização
 
 O botão **Atualizar agora** em *Minhas lojas* dispara o sync das lojas de quem está logado.

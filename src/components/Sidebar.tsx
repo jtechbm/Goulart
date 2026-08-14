@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, DollarSign, LayoutDashboard, Plug, Receipt, Store } from "lucide-react";
+import { Boxes, DollarSign, FileText, LayoutDashboard, Plug, Receipt, Scale, Store } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,8 @@ const NAV = [
   { href: "/", label: "Início", Icon: LayoutDashboard },
   { href: "/vendas", label: "Vendas", Icon: Receipt },
   { href: "/faturamento", label: "Faturamento", Icon: DollarSign },
+  { href: "/relatorios", label: "Relatórios", Icon: FileText },
+  { href: "/comparador", label: "Comparador de preços", Icon: Scale },
   { href: "/lojas", label: "Minhas lojas", Icon: Store },
   { href: "/estoque", label: "Estoque", Icon: Boxes },
   { href: "/integracoes", label: "Integrações", Icon: Plug },

@@ -219,6 +219,43 @@ body {
   }
 }
 
+/* Impressão / "Salvar como PDF" do relatório.
+   Fora o menu e o topo, que não dizem nada no papel, e tinta escura sobre
+   fundo branco — imprimir o tema escuro gastaria a impressora e sairia pior. */
+@media print {
+  aside,
+  header {
+    display: none !important;
+  }
+
+  :root {
+    --plane: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f6f6f8;
+    --surface-3: #eeeef2;
+    --border: #d6d6de;
+    --ink: #101014;
+    --ink-2: #33333d;
+    --ink-muted: #5c5c68;
+    --good-text: #00631f;
+    --critical: #a31616;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  /* Uma tabela cortada no meio da página é ilegível. */
+  table,
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
