@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@/lib/auth";
+import { cleanupExpiredSessions, currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { limparTentativasAntigas } from "@/lib/rateLimit";
 import { syncAccount, syncAll } from "@/lib/sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * POST /api/sync              -> sincroniza todas as contas conectadas
- * POST /api/sync?account=<id> -> sincroniza uma conta
+ * POST /api/sync              -> sincroniza as lojas de quem chamou
+ * POST /api/sync?account=<id> -> sincroniza uma loja
  * POST /api/sync?days=60      -> janela de dias (padrão 30)
  *
  * Chamadas sem sessão (cron) precisam do header:
  *   authorization: Bearer <CRON_SECRET>
+ * e aí rodam sobre a base inteira.
  */
 export async function POST(req: Request) {
   const url = new URL(req.url);
@@ -23,20 +25,15 @@ export async function POST(req: Request) {
   let scopeClientId: string | null = null;
 
   if (secret && auth === `Bearer ${secret}`) {
-    // chamada de cron — roda sobre a carteira toda, sem sessão
+    // Chamada de cron: roda sobre todas as lojas, sem sessão. Aproveita a
+    // passagem para a faxina — sessão vencida e contador de login velho não
+    // valem um agendamento só para eles, e sem isso as duas tabelas só crescem.
+    await Promise.all([cleanupExpiredSessions(), limparTentativasAntigas()]);
   } else {
     const user = await currentUser();
-    if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-
-    if (user.role === "ADMIN") {
-      if (!user.permissions.includes("contas")) {
-        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-      }
-    } else {
-      // o lojista só dispara o sync das próprias lojas
-      if (!user.clientId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-      scopeClientId = user.clientId;
-    }
+    if (!user?.clientId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    // o lojista só dispara o sync das próprias lojas
+    scopeClientId = user.clientId;
   }
 
   const days = Math.min(365, Math.max(1, Number(url.searchParams.get("days") ?? 30)));

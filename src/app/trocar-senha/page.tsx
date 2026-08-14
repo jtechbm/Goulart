@@ -1,34 +1,34 @@
-import { KeyRound } from "lucide-react";
+import { ArrowLeft, KeyRound } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentUser, hashPassword, homeFor, verifyPassword } from "@/lib/auth";
+import { comAviso, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+/** Troca voluntária de senha — ninguém é obrigado a passar por aqui. */
 async function trocar(formData: FormData) {
   "use server";
 
-  const user = await currentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser();
 
   const atual = String(formData.get("atual") ?? "");
   const nova = String(formData.get("nova") ?? "");
   const confirma = String(formData.get("confirma") ?? "");
 
-  if (nova.length < 8) redirect("/trocar-senha?erro=A nova senha precisa ter ao menos 8 caracteres.");
-  if (nova !== confirma) redirect("/trocar-senha?erro=A confirmação não confere.");
+  if (nova.length < 8) {
+    redirect(comAviso("/trocar-senha", "erro", "A nova senha precisa ter ao menos 8 caracteres."));
+  }
+  if (nova !== confirma) redirect(comAviso("/trocar-senha", "erro", "A confirmação não confere."));
 
   const row = await prisma.user.findUnique({ where: { id: user.id } });
   if (!row || !verifyPassword(atual, row.passwordHash)) {
-    redirect("/trocar-senha?erro=Senha atual incorreta.");
+    redirect(comAviso("/trocar-senha", "erro", "Senha atual incorreta."));
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: hashPassword(nova), mustChangePassword: false },
-  });
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: hashPassword(nova) } });
 
-  redirect(homeFor(user));
+  redirect(comAviso("/", "ok", "Senha alterada."));
 }
 
 export default async function TrocarSenhaPage({
@@ -36,9 +36,8 @@ export default async function TrocarSenhaPage({
 }: {
   searchParams: Promise<{ erro?: string }>;
 }) {
+  await requireUser();
   const { erro } = await searchParams;
-  const user = await currentUser();
-  if (!user) redirect("/login");
 
   return (
     <main className="grid min-h-dvh place-items-center px-6 py-12">
@@ -47,12 +46,7 @@ export default async function TrocarSenhaPage({
           <span className="grid size-14 place-items-center rounded-2xl bg-brand-soft text-brand">
             <KeyRound size={24} />
           </span>
-          <h1 className="mt-4 text-2xl font-bold text-ink">Defina sua senha</h1>
-          <p className="mt-1 text-sm text-ink-2">
-            {user.mustChangePassword
-              ? "Seu acesso foi criado com uma senha provisória. Escolha uma senha sua para continuar."
-              : "Atualize a senha da sua conta."}
-          </p>
+          <h1 className="mt-4 text-2xl font-bold text-ink">Trocar senha</h1>
         </div>
 
         <div className="rounded-2xl border border-line bg-surface p-6">
@@ -98,6 +92,15 @@ export default async function TrocarSenhaPage({
             </button>
           </form>
         </div>
+
+        <p className="mt-5 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink"
+          >
+            <ArrowLeft size={14} /> Voltar
+          </Link>
+        </p>
       </div>
     </main>
   );

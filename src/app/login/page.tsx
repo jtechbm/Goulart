@@ -1,7 +1,9 @@
-import { FlaskConical, Zap } from "lucide-react";
+import Image from "next/image";
 import { redirect } from "next/navigation";
-import { createSession, currentUser, homeFor, verifyPassword } from "@/lib/auth";
+import { comAviso, createSession, currentUser, homeFor, verifyPassword } from "@/lib/auth";
+import { APP_NAME, APP_TAGLINE, LOGO_SRC } from "@/lib/brand";
 import { prisma } from "@/lib/db";
+import { checarLimite, limparFalhas, registrarFalha } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,21 +12,37 @@ async function entrar(formData: FormData) {
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) redirect("/login?erro=Informe e-mail e senha.");
+  if (!email || !password) redirect(comAviso("/login", "erro", "Informe e-mail e senha."));
+
+  // Antes de tocar no banco de usuários: quem já estourou o limite não passa,
+  // senão o scrypt (que é caro de propósito) vira o próprio vetor de ataque.
+  const limite = await checarLimite(email);
+  if (!limite.permitido) {
+    const min = Math.ceil(limite.segundos / 60);
+    redirect(comAviso("/login", "erro", `Muitas tentativas. Tente de novo em ${min} minuto(s).`));
+  }
 
   const user = await prisma.user.findUnique({ where: { email } });
 
   // Mensagem única para credencial errada e usuário inexistente: não entregamos
   // quais e-mails existem na base.
-  const genericError = "/login?erro=E-mail ou senha inválidos.";
   if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
-    redirect(genericError);
+    await registrarFalha(email);
+    redirect(comAviso("/login", "erro", "E-mail ou senha inválidos."));
   }
 
+  // Todo acesso é de lojista: sem `clientId` não há escopo e não há tela para
+  // abrir. Barramos aqui, com senha já conferida, em vez de deixar a pessoa
+  // entrar e esbarrar no guard depois.
+  if (!user.clientId) {
+    redirect(comAviso("/login", "erro", "Este acesso não está vinculado a nenhuma loja."));
+  }
+
+  await limparFalhas(email);
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(user.id);
 
-  redirect(user.mustChangePassword ? "/trocar-senha" : homeFor(user));
+  redirect(homeFor());
 }
 
 export default async function LoginPage({
@@ -35,17 +53,15 @@ export default async function LoginPage({
   const { erro } = await searchParams;
 
   const already = await currentUser();
-  if (already) redirect(homeFor(already));
+  if (already) redirect(homeFor());
 
   return (
     <main className="grid min-h-dvh place-items-center px-6 py-12">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="grid size-14 place-items-center rounded-2xl bg-brand text-brand-ink">
-            <Zap size={26} strokeWidth={2.5} />
-          </span>
-          <h1 className="mt-4 text-2xl font-bold text-ink">GoulartERP</h1>
-          <p className="mt-1 text-sm text-ink-2">Gestão multi-marketplace</p>
+          <Image src={LOGO_SRC} alt="" width={56} height={56} priority className="size-14 rounded-2xl object-contain" />
+          <h1 className="mt-4 text-2xl font-bold text-ink">{APP_NAME}</h1>
+          <p className="mt-1 text-sm text-ink-2">{APP_TAGLINE}</p>
         </div>
 
         <div className="rounded-2xl border border-line bg-surface p-6">
@@ -100,23 +116,6 @@ export default async function LoginPage({
             </button>
           </form>
         </div>
-
-        <p className="mt-5 text-center text-[13px] text-ink-muted">
-          Ainda não tem acesso? Fale com seu gestor para receber o login.
-        </p>
-
-        <p className="mt-6 text-center">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest"
-            style={{
-              color: "var(--warning)",
-              backgroundColor: "color-mix(in srgb, var(--warning) 16%, transparent)",
-            }}
-          >
-            <FlaskConical size={11} aria-hidden />
-            Protótipo · dados de demonstração
-          </span>
-        </p>
       </div>
     </main>
   );

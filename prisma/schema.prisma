@@ -1,7 +1,7 @@
-// JtechERP — schema multi-marketplace
+// JtechDash — schema multi-marketplace
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   // Permite `relationLoadStrategy: "join"`: sem isso o Prisma resolve cada
   // include aninhado numa query separada e sequencial — caro quando o banco
   // não está ao lado da aplicação.
@@ -20,33 +20,22 @@ datasource db {
 // Acesso
 // ---------------------------------------------------------------------------
 
-/// ADMIN = Kadu e equipe da agência (vê a carteira toda).
-/// CLIENT = lojista assinante (vê só o próprio clientId).
+/// Pessoa que entra no sistema. Sempre vinculada a um Client, que é o escopo
+/// de tudo que ela enxerga.
 model User {
   id           String  @id @default(cuid())
   email        String  @unique
   passwordHash String
   name         String
-  /// Em qual área a pessoa entra.
-  role   String // ADMIN | CLIENT
-  active Boolean @default(true)
+  active       Boolean @default(true)
 
-  /// Função dentro da agência — define o que ela vê. Ver src/lib/permissions.ts.
-  /// Só faz sentido quando role = ADMIN.
-  staffRole String? // diretor | analista | financeiro | suporte
-
-  /// Preenchido só para role=CLIENT — é o escopo de tudo que ele enxerga.
+  /// Escopo de tudo que a pessoa vê. Sem ele não há tela para abrir.
   clientId String?
   client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  teamMemberId String?
-  teamMember   TeamMember? @relation(fields: [teamMemberId], references: [id], onDelete: SetNull)
-
-  /// Senha provisória entregue pelo Kadu: força a troca no primeiro acesso.
-  mustChangePassword Boolean   @default(false)
-  lastLoginAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   sessions Session[]
 
@@ -66,25 +55,11 @@ model Session {
 }
 
 // ---------------------------------------------------------------------------
-// Agência / equipe
+// Lojista
 // ---------------------------------------------------------------------------
 
-model TeamMember {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  role      String // diretor | analista_senior | analista | atendimento
-  avatarHex String? // cor do avatar
-  createdAt DateTime @default(now())
-
-  accounts Account[]
-  users    User[]
-}
-
-// ---------------------------------------------------------------------------
-// Clientes da agência
-// ---------------------------------------------------------------------------
-
+/// A empresa dona das lojas. É o escopo de segurança do sistema inteiro:
+/// toda consulta filtra por `clientId`.
 model Client {
   id        String   @id @default(cuid())
   name      String
@@ -95,28 +70,8 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  accounts     Account[]
-  invoices     Invoice[]
-  threads      Thread[]
-  users        User[]
-  subscription Subscription?
-}
-
-/// Contrato do cliente com a agência: o valor e o dia que geram as faturas.
-model Subscription {
-  id       String @id @default(cuid())
-  clientId String @unique
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  amount    Float
-  dueDay    Int      @default(10)
-  method    String   @default("PIX")
-  status    String   @default("ATIVA") // ATIVA | PAUSADA | CANCELADA
-  startedAt DateTime @default(now())
-  canceledAt DateTime?
-  notes     String?
-
-  invoices Invoice[]
+  accounts Account[]
+  users    User[]
 }
 
 // ---------------------------------------------------------------------------
@@ -127,9 +82,6 @@ model Account {
   id       String @id @default(cuid())
   clientId String
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  ownerId String?
-  owner   TeamMember? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   platform    String // MERCADO_LIVRE | SHOPEE | TIKTOK_SHOP
   shopName    String
@@ -153,11 +105,10 @@ model Account {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  orders    Order[]
-  metrics   DailyMetric[]
-  analyses  Analysis[]
-  syncLogs  SyncLog[]
-  products  Product[]
+  orders   Order[]
+  metrics  DailyMetric[]
+  syncLogs SyncLog[]
+  products Product[]
 
   @@unique([platform, externalId])
   @@index([clientId])
@@ -196,13 +147,13 @@ model Product {
   externalId String
   sku        String?
   title      String
-  price      Float   @default(0)
-  currency   String  @default("BRL")
-  stock      Int     @default(0)
-  status     String  @default("active") // active | paused | closed
+  price      Float    @default(0)
+  currency   String   @default("BRL")
+  stock      Int      @default(0)
+  status     String   @default("active") // active | paused | closed
   imageUrl   String?
   permalink  String?
-  soldCount  Int     @default(0)
+  soldCount  Int      @default(0)
   syncedAt   DateTime @default(now())
 
   /// SYNCED = veio do marketplace (o sync manda nele).
@@ -213,8 +164,7 @@ model Product {
   /// (model_id da Shopee, sku_id + warehouse_id do TikTok). JSON.
   meta String?
 
-  movements         StockMovement[]
-  marketComparisons MarketComparison[]
+  movements StockMovement[]
 
   @@unique([accountId, externalId])
   @@index([accountId, stock])
@@ -237,45 +187,8 @@ model StockMovement {
   authorName String
 
   /// Se o estoque foi propagado para o marketplace.
-  pushed     Boolean @default(false)
-  pushError  String?
-
-  createdAt DateTime @default(now())
-
-  @@index([productId, createdAt])
-}
-
-/// Preço de um concorrente encontrado para um produto do cliente, na MESMA
-/// plataforma. Usado por Shopee e TikTok Shop, que não têm API pública de
-/// busca — os dados vêm de busca na web e são ESTIMATIVA, ao contrário do
-/// Mercado Livre, cujo preço vem exato da API oficial.
-///
-/// Persistido em vez de consultado a cada abertura de tela por dois motivos:
-/// a busca leva ~26s (não cabe numa renderização) e cada uma custa dinheiro.
-///
-/// Acesso restrito ao Kadu (ver `requireKadu` em src/lib/auth.ts): é ferramenta
-/// de precificação da agência, não faz sentido para clientes nem pra equipe.
-model MarketComparison {
-  id        String  @id @default(cuid())
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  /// Copiado de product.account.platform na criação — trava a comparação na
-  /// mesma plataforma do anúncio do cliente.
-  platform String
-
-  competitorSeller String
-  competitorTitle  String
-  competitorPrice  Float
-  competitorUrl    String?
-  note             String?
-
-  /// Trecho da página de onde o preço foi lido. Guardado para auditoria: dá
-  /// para conferir depois de onde saiu cada número.
-  sourceExcerpt String?
-
-  authorId   String?
-  authorName String
+  pushed    Boolean @default(false)
+  pushError String?
 
   createdAt DateTime @default(now())
 
@@ -307,78 +220,28 @@ model SyncLog {
   kind      String // orders | metrics | token_refresh | ads
   ok        Boolean
   message   String?
-  itemCount Int      @default(0)
-  startedAt DateTime @default(now())
+  itemCount Int       @default(0)
+  startedAt DateTime  @default(now())
   endedAt   DateTime?
 
   @@index([accountId, startedAt])
 }
 
-// ---------------------------------------------------------------------------
-// Operação da agência
-// ---------------------------------------------------------------------------
+/// Contador de tentativas de login para o rate limit.
+///
+/// Uma linha por chave, onde chave é `ip:<endereço>` ou `email:<e-mail>`. Fica
+/// no banco, não em memória: em serverless cada requisição pode cair numa
+/// instância diferente, e um contador em RAM zera a cada cold start — não
+/// limitaria nada.
+model LoginAttempt {
+  key      String   @id
+  attempts Int      @default(0)
+  /// Início da janela corrente. Passou da janela, o contador recomeça.
+  windowAt DateTime @default(now())
+  /// Preenchido quando estourou o limite; até lá, o login é recusado.
+  blockedUntil DateTime?
 
-model Analysis {
-  id        String  @id @default(cuid())
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  title     String
-  verdict   String // SAUDAVEL | ATENCAO | CRITICO
-  summary   String
-  focuses   String // JSON: [{ title, verdict, finding, action }]
-  createdAt DateTime @default(now())
-
-  @@index([accountId, createdAt])
-}
-
-model Invoice {
-  id       String @id @default(cuid())
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  subscriptionId String?
-  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-
-  amount    Float
-  dueDay    Int      @default(10)
-  dueDate   DateTime
-  method    String   @default("PIX")
-  status    String   @default("PENDENTE") // PAGO | PENDENTE | ATRASADO
-  paidAt    DateTime?
-  paidNote  String? // como o Kadu deu baixa (ex.: "PIX recebido 12/07")
-  /// Competência "AAAA-MM" — garante uma fatura por mês por cliente.
-  reference String
-  createdAt DateTime @default(now())
-
-  @@unique([clientId, reference])
-  @@index([clientId, dueDate])
-}
-
-model Thread {
-  id       String @id @default(cuid())
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  subject   String?
-  unread    Int      @default(0)
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-
-  messages Message[]
-}
-
-model Message {
-  id       String @id @default(cuid())
-  threadId String
-  thread   Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-
-  authorType String // CLIENT | AGENCY | SYSTEM
-  authorName String
-  body       String
-  createdAt  DateTime @default(now())
-
-  @@index([threadId, createdAt])
+  @@index([blockedUntil])
 }
 
 // Guarda o state/PKCE do OAuth entre o /start e o /callback

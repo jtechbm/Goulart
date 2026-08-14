@@ -2,16 +2,25 @@ import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { adapterBySlug } from "@/lib/integrations";
+import { appUrl } from "@/lib/integrations/types";
 import { persistTokens } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
 
-/** Devolve cada papel para a tela de integração da própria área. */
-function back(message: string, ok = false, role: "ADMIN" | "CLIENT" = "ADMIN") {
-  const base = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
-  const path = role === "CLIENT" ? "/portal/integracoes" : "/configuracoes";
+/**
+ * Volta para a tela de Integrações com o recado. `appUrl()` é a mesma função
+ * que monta o redirect_uri registrado na plataforma — se ela não estiver
+ * configurada, caímos na origem da própria requisição em vez de quebrar.
+ */
+function back(req: Request, message: string, ok = false) {
+  let base: string;
+  try {
+    base = appUrl();
+  } catch {
+    base = new URL(req.url).origin;
+  }
   const qs = new URLSearchParams({ [ok ? "ok" : "erro"]: message });
-  return NextResponse.redirect(`${base}${path}?${qs.toString()}`);
+  return NextResponse.redirect(`${base}/integracoes?${qs.toString()}`);
 }
 
 /**
@@ -21,32 +30,31 @@ function back(message: string, ok = false, role: "ADMIN" | "CLIENT" = "ADMIN") {
 export async function GET(req: Request, ctx: { params: Promise<{ platform: string }> }) {
   const { platform: slug } = await ctx.params;
   const user = await currentUser();
-  const role = user?.role ?? "ADMIN";
 
   const adapter = adapterBySlug(slug);
-  if (!adapter) return back(`Plataforma desconhecida: ${slug}`, false, role);
+  if (!adapter) return back(req, `Plataforma desconhecida: ${slug}`);
 
   const params = new URL(req.url).searchParams;
 
   if (params.get("error")) {
-    return back(`Autorização negada: ${params.get("error_description") ?? params.get("error")}`, false, role);
+    return back(req, `Autorização negada: ${params.get("error_description") ?? params.get("error")}`);
   }
 
   const state = params.get("state");
-  if (!state) return back("Callback sem `state`.", false, role);
+  if (!state) return back(req, "Callback sem `state`.");
 
   const saved = await prisma.oAuthState.findUnique({ where: { state } });
-  if (!saved) return back("State inválido ou já utilizado.", false, role);
+  if (!saved) return back(req, "State inválido ou já utilizado.");
 
   // consome o state em qualquer desfecho — protege contra replay
   await prisma.oAuthState.delete({ where: { id: saved.id } });
 
-  if (saved.expiresAt < new Date()) return back("Autorização expirou. Tente novamente.", false, role);
-  if (saved.platform !== adapter.platform) return back("State não corresponde à plataforma.", false, role);
-  if (!saved.clientId) return back("State sem cliente associado.", false, role);
-  // um lojista não pode concluir um fluxo iniciado para outro cliente
-  if (user?.role === "CLIENT" && saved.clientId !== user.clientId) {
-    return back("Esta autorização pertence a outra conta.", false, role);
+  if (saved.expiresAt < new Date()) return back(req, "Autorização expirou. Tente novamente.");
+  if (saved.platform !== adapter.platform) return back(req, "State não corresponde à plataforma.");
+  if (!saved.clientId) return back(req, "State sem loja associada.");
+  // um lojista não pode concluir um fluxo iniciado por outro
+  if (saved.clientId !== user?.clientId) {
+    return back(req, "Esta autorização pertence a outra conta.");
   }
 
   try {
@@ -64,20 +72,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
      */
     const existente = await prisma.account.findUnique({
       where: { platform_externalId: { platform: adapter.platform, externalId: tokens.externalId } },
-      include: { client: { select: { name: true } } },
     });
 
     if (existente && existente.clientId !== saved.clientId) {
-      const destino = await prisma.client.findUnique({
-        where: { id: saved.clientId },
-        select: { name: true },
-      });
       return back(
-        `Esta loja já está conectada em "${existente.client.name}". Para movê-la para ` +
-          `"${destino?.name ?? "outro cliente"}", desconecte-a primeiro — a transferência ` +
-          `levaria junto todo o histórico de pedidos e faturamento.`,
-        false,
-        role,
+        req,
+        "Esta loja já está conectada em outra conta deste sistema. Desconecte-a de lá antes " +
+          "de conectá-la aqui — a transferência levaria junto todo o histórico de pedidos e " +
+          "faturamento.",
       );
     }
 
@@ -99,9 +101,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
     });
 
     await persistTokens(account.id, tokens);
-    return back(`${account.shopName} conectada com sucesso.`, true, role);
+    return back(req, `${account.shopName} conectada com sucesso.`, true);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return back(message.slice(0, 300), false, role);
+    return back(req, message.slice(0, 300));
   }
 }

@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import type { ReactNode } from "react";
 import { pct } from "@/lib/format";
 
@@ -37,50 +37,6 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
       </div>
       {action}
     </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Status — escala fixa, sempre com ícone + rótulo (nunca cor sozinha)         */
-/* -------------------------------------------------------------------------- */
-
-export type Health = "SAUDAVEL" | "ATENCAO" | "CRITICO";
-
-const HEALTH = {
-  SAUDAVEL: { label: "Saudável", color: "var(--good)", Icon: CircleCheck },
-  ATENCAO: { label: "Atenção", color: "var(--warning)", Icon: TriangleAlert },
-  CRITICO: { label: "Crítico", color: "var(--critical)", Icon: CircleAlert },
-} as const;
-
-export function HealthPill({ health }: { health: Health }) {
-  const { label, color, Icon } = HEALTH[health];
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}
-    >
-      <Icon size={13} aria-hidden />
-      {label}
-    </span>
-  );
-}
-
-const INVOICE = {
-  PAGO: { label: "Pago", color: "var(--good)", Icon: CircleCheck },
-  PENDENTE: { label: "Pendente", color: "var(--warning)", Icon: TriangleAlert },
-  ATRASADO: { label: "Atrasado", color: "var(--critical)", Icon: CircleAlert },
-} as const;
-
-export function InvoicePill({ status }: { status: keyof typeof INVOICE }) {
-  const { label, color, Icon } = INVOICE[status] ?? INVOICE.PENDENTE;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}
-    >
-      <Icon size={13} aria-hidden />
-      {label}
-    </span>
   );
 }
 

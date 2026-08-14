@@ -187,7 +187,8 @@ export async function rebuildDailyMetrics(accountId: string, from: Date, to: Dat
 
 /**
  * Sincroniza as contas conectadas. `clientId` restringe às lojas de um cliente
- * — é o que o portal usa, para o lojista não disparar sync da carteira toda.
+ * — é o que a sessão do lojista usa. Sem ele (só o cron, com CRON_SECRET) roda
+ * sobre todas as lojas da base.
  */
 export async function syncAll(days = 30, clientId?: string | null): Promise<SyncResult[]> {
   const accounts = await prisma.account.findMany({

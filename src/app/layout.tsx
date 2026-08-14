@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GoulartERP — Multi-marketplace",
-  description: "ERP de gestão multi-marketplace: Mercado Livre, Shopee e TikTok Shop.",
+  title: `${APP_NAME} — ${APP_TAGLINE}`,
+  description: "Faturamento, estoque e integrações das lojas em Mercado Livre, Shopee e TikTok Shop.",
 };
 
 // Evita o flash de tema errado: aplica o data-theme antes da primeira pintura.
@@ -16,8 +17,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      {/* O shell (sidebar) vive nos layouts de cada área — a agência e o
-          portal do cliente têm menus diferentes, e o login não tem nenhum. */}
+      {/* O shell (sidebar) vive no layout do grupo (app): o login e a troca de
+          senha não têm menu. */}
       <body>{children}</body>
     </html>
   );

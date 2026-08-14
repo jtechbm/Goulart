@@ -15,3 +15,6 @@ tsconfig.tsbuildinfo
 .claude/settings.local.json
 .vscode/
 .idea/
+
+# backup pontual do banco (contem hashes de senha e tokens cifrados)
+backup-pre-migracao.json

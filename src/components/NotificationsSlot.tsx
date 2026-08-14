@@ -10,9 +10,8 @@ import { NotificationsBell } from "./NotificationsBell";
  */
 export async function NotificationsSlot() {
   const user = await currentUser();
-  if (!user) return null;
-  // a lista já vem filtrada pela permissão de quem está olhando
-  return <NotificationsBell items={await notificationsFor(user)} />;
+  if (!user?.clientId) return null;
+  return <NotificationsBell items={await notificationsFor(user.clientId)} />;
 }
 
 /** Placeholder do mesmo tamanho, para não haver salto quando o sino chega. */
