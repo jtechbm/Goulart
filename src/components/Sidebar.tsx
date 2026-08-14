@@ -1,17 +1,18 @@
 "use client";
 
-import { Boxes, DollarSign, LayoutDashboard, Plug, Store } from "lucide-react";
+import { Boxes, DollarSign, LayoutDashboard, Plug, Receipt, Store } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { APP_NAME, LOGO_SRC } from "@/lib/brand";
+import { larguraPara, LOGO_ALT, LOGO_ALTURA_MENU, LOGO_SRC } from "@/lib/brand";
 import { NavLink } from "./NavLink";
 import { useSidebar } from "./SidebarContext";
 
 /** Menu do lojista. Tudo aqui é escopo do próprio cliente logado. */
 const NAV = [
   { href: "/", label: "Início", Icon: LayoutDashboard },
+  { href: "/vendas", label: "Vendas", Icon: Receipt },
   { href: "/faturamento", label: "Faturamento", Icon: DollarSign },
   { href: "/lojas", label: "Minhas lojas", Icon: Store },
   { href: "/estoque", label: "Estoque", Icon: Boxes },
@@ -38,20 +39,17 @@ export function Sidebar({ subtitle }: { subtitle: string }) {
           open ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
         }`}
       >
-        <Link href="/" className="flex items-center gap-3 px-5 py-6">
+        <Link href="/" className="block px-5 py-6">
           <Image
             src={LOGO_SRC}
-            alt=""
-            width={40}
-            height={40}
+            alt={LOGO_ALT}
+            width={larguraPara(LOGO_ALTURA_MENU)}
+            height={LOGO_ALTURA_MENU}
             priority
-            className="size-10 shrink-0 rounded-xl object-contain"
+            className="h-11 w-auto max-w-full object-contain object-left"
           />
-          <span className="min-w-0 leading-tight">
-            <span className="block text-[17px] font-bold text-ink">{APP_NAME}</span>
-            <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-              {subtitle}
-            </span>
+          <span className="mt-2 block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+            {subtitle}
           </span>
         </Link>
 

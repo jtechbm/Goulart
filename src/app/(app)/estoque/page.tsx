@@ -13,6 +13,7 @@ import {
   moveStock,
   REASON_LABEL,
   REASONS,
+  setProductCosts,
   type Reason,
 } from "@/lib/inventory";
 
@@ -58,6 +59,29 @@ async function movimentar(formData: FormData) {
     result.ok
       ? `/estoque?ok=${encodeURIComponent(`Estoque atualizado para ${result.stock} unidade(s).`)}`
       : `/estoque?erro=${encodeURIComponent(result.message ?? "Não foi possível atualizar.")}`,
+  );
+}
+
+async function salvarCustos(formData: FormData) {
+  "use server";
+  const user = await requireClient();
+
+  const brlParaNumero = (v: FormDataEntryValue | null) =>
+    Number(String(v ?? "0").replace(/\./g, "").replace(",", "."));
+
+  const r = await setProductCosts({
+    productId: String(formData.get("productId") ?? ""),
+    cost: brlParaNumero(formData.get("cost")),
+    extraCost: brlParaNumero(formData.get("extraCost")),
+    clientId: user.clientId,
+  });
+
+  revalidatePath("/estoque");
+  revalidatePath("/vendas"); // a margem de toda venda daquele produto muda junto
+  redirect(
+    r.ok
+      ? comAviso("/estoque", "ok", "Custos atualizados. A margem das vendas foi recalculada.")
+      : comAviso("/estoque", "erro", r.message ?? "Não foi possível salvar."),
   );
 }
 
@@ -199,6 +223,7 @@ export default async function EstoquePage({
                     <th className="px-5 py-3.5">Loja</th>
                     <th className="px-5 py-3.5 text-right">Preço</th>
                     <th className="px-5 py-3.5 text-right">Estoque</th>
+                    <th className="px-5 py-3.5">Custo · Custo extra</th>
                     <th className="px-5 py-3.5">Movimentar</th>
                   </tr>
                 </thead>
@@ -235,6 +260,34 @@ export default async function EstoquePage({
                               {tone.label}
                             </span>
                           )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <form action={salvarCustos} className="flex flex-wrap items-center gap-1.5">
+                            <input type="hidden" name="productId" value={p.id} />
+                            <input
+                              name="cost"
+                              inputMode="decimal"
+                              defaultValue={p.cost ? p.cost.toFixed(2).replace(".", ",") : ""}
+                              placeholder="custo"
+                              aria-label={`Custo de ${p.title}`}
+                              className="w-20 rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink tabular placeholder:text-ink-muted"
+                              style={p.cost > 0 ? undefined : { borderColor: "var(--warning)" }}
+                            />
+                            <input
+                              name="extraCost"
+                              inputMode="decimal"
+                              defaultValue={p.extraCost ? p.extraCost.toFixed(2).replace(".", ",") : ""}
+                              placeholder="extra"
+                              aria-label={`Custo extra de ${p.title}`}
+                              className="w-16 rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink tabular placeholder:text-ink-muted"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-lg border border-line px-2 py-1.5 text-[12px] font-medium text-ink-2 transition-colors hover:text-ink"
+                            >
+                              Salvar
+                            </button>
+                          </form>
                         </td>
                         <td className="px-5 py-4">
                           <form action={movimentar} className="flex flex-wrap items-center gap-1.5">

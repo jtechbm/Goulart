@@ -1,4 +1,4 @@
-# JtechDash
+# ArtSul Decorações
 
 Sistema de gestão multi-marketplace do lojista: **Mercado Livre**, **Shopee** e
 **TikTok Shop** em um lugar só — faturamento, lojas conectadas, estoque (que o próprio
@@ -20,9 +20,20 @@ npm run db:push           # aplica o schema
 npm run dev               # http://localhost:3000
 ```
 
-Não há dados de demonstração nem cadastro aberto: o primeiro acesso é criado na mão.
+O banco nasce vazio. Há duas formas de criar acesso.
 
-### Criando o acesso de um lojista
+### Cadastro aberto
+
+`/cadastro` cria a empresa e o login juntos, numa transação. **Não há confirmação por
+e-mail** — nada de serviço de e-mail está configurado, então dá para se cadastrar com
+endereço falso. O que existe é limite de **5 cadastros por IP a cada 15 minutos**, que
+segura volume, não falsidade. Antes de abrir isto ao público, plugue a confirmação.
+
+Cada cadastro cria a **própria** empresa, mesmo que já exista outra de nome igual:
+`clientId` é o escopo de isolamento, e reaproveitar por nome colocaria dois desconhecidos
+dentro dos mesmos dados.
+
+### Criando o acesso pela linha de comando
 
 ```bash
 npm run criar-acesso -- --loja "Nome da Empresa" --nome "Maria" --email maria@empresa.com.br
@@ -167,12 +178,14 @@ Na Vercel, agende com `vercel.json`:
 src/
 ├── app/
 │   ├── login/                tela de entrada (pública)
-│   ├── trocar-senha/         primeiro acesso e troca de senha
+│   ├── cadastro/             criação de conta (pública, com limite por IP)
+│   ├── trocar-senha/         troca voluntária de senha
 │   ├── (app)/                O SISTEMA — guard no layout do grupo
 │   │   ├── page.tsx          Início
+│   │   ├── vendas/           lucro e margem item a item
 │   │   ├── faturamento/      receita, custos e margem
 │   │   ├── lojas/            desempenho por loja + sync manual
-│   │   ├── estoque/          movimentação com write-back e ledger
+│   │   ├── estoque/          movimentação, custos e ledger
 │   │   └── integracoes/      conectar/reconectar marketplaces
 │   └── api/
 │       ├── oauth/[platform]/start     inicia o OAuth (state + PKCE)
@@ -185,6 +198,8 @@ src/
     ├── auth.ts / password.ts sessão, guards e hashing (separados de propósito:
     │                         os scripts importam o hashing sem arrastar `next/headers`)
     ├── crypto.ts             AES-256-GCM, HMAC, PKCE
+    ├── rateLimit.ts          limite de tentativas de login e de cadastro
+    ├── sales.ts              a conta de lucro e margem por item (fonte única)
     ├── tokens.ts             refresh transparente
     ├── sync.ts               pedidos + agregado diário + catálogo/estoque
     ├── inventory.ts          entrada/saída de estoque com write-back e ledger
@@ -197,6 +212,9 @@ Scripts:
 - `scripts/criar-acesso.ts` — cria a loja e o login (é o caminho oficial de cadastro).
 - `scripts/proteger-banco.ts` — liga RLS e revoga os privilégios de `anon`/`authenticated`.
   Roda sozinho no fim do `db:push`.
+- `scripts/dados-exemplo.ts` — 6 pedidos e 5 produtos de Mercado Livre para dar o que ver
+  nas telas. Cada caso cobre um estado: lucro, prejuízo por frete grátis, custo em branco e
+  venda sem produto vinculado. `--limpar` remove.
 - `scripts/dev-check-inventory.ts` — exercita entrada, saída, saldo negativo e o escopo
   por cliente do módulo de estoque. Só desenvolvimento.
 

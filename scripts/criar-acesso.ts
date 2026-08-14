@@ -4,7 +4,7 @@
  * Não existe cadastro aberto no sistema: o login é criado aqui e entregue à
  * pessoa, que troca a senha no primeiro acesso.
  *
- *   npm run criar-acesso -- --loja "Arsul Decorações" --nome "Maria" --email maria@arsul.com.br
+ *   npm run criar-acesso -- --loja "Nome da Empresa" --nome "Maria" --email maria@empresa.com.br
  *
  * Opções:
  *   --loja   <nome>   nome da empresa (reutiliza se já existir)

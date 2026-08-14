@@ -1,5 +1,5 @@
 {
-  "name": "jtechdash",
+  "name": "artsul-decoracoes",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -11,7 +11,8 @@
     "db:secure": "tsx scripts/proteger-banco.ts",
     "db:studio": "prisma studio",
     "criar-acesso": "tsx scripts/criar-acesso.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "dados-exemplo": "tsx scripts/dados-exemplo.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

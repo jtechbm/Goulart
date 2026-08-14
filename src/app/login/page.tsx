@@ -1,7 +1,8 @@
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { comAviso, createSession, currentUser, homeFor, verifyPassword } from "@/lib/auth";
-import { APP_NAME, APP_TAGLINE, LOGO_SRC } from "@/lib/brand";
+import { APP_TAGLINE, larguraPara, LOGO_ALT, LOGO_ALTURA_LOGIN, LOGO_SRC } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { checarLimite, limparFalhas, registrarFalha } from "@/lib/rateLimit";
 
@@ -59,9 +60,18 @@ export default async function LoginPage({
     <main className="grid min-h-dvh place-items-center px-6 py-12">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Image src={LOGO_SRC} alt="" width={56} height={56} priority className="size-14 rounded-2xl object-contain" />
-          <h1 className="mt-4 text-2xl font-bold text-ink">{APP_NAME}</h1>
-          <p className="mt-1 text-sm text-ink-2">{APP_TAGLINE}</p>
+          {/* A logo é um wordmark: já diz o nome, então não há <h1> repetindo. */}
+          <h1>
+            <Image
+              src={LOGO_SRC}
+              alt={LOGO_ALT}
+              width={larguraPara(LOGO_ALTURA_LOGIN)}
+              height={LOGO_ALTURA_LOGIN}
+              priority
+              className="h-[76px] w-auto max-w-full object-contain"
+            />
+          </h1>
+          <p className="mt-3 text-sm text-ink-2">{APP_TAGLINE}</p>
         </div>
 
         <div className="rounded-2xl border border-line bg-surface p-6">
@@ -116,6 +126,13 @@ export default async function LoginPage({
             </button>
           </form>
         </div>
+
+        <p className="mt-5 text-center text-[13px] text-ink-muted">
+          Ainda não tem conta?{" "}
+          <Link href="/cadastro" className="font-semibold text-brand hover:underline">
+            Criar conta
+          </Link>
+        </p>
       </div>
     </main>
   );

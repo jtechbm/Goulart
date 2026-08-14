@@ -120,6 +120,36 @@ export async function moveStock(input: {
   return { ok: true, stock: stockAfter, pushed };
 }
 
+/**
+ * Grava custo de aquisição e custo extra por unidade.
+ *
+ * Sem snapshot no pedido de propósito: a margem das vendas passadas é
+ * recalculada a partir do custo atual. É o comportamento certo para quem está
+ * começando — preencher o custo hoje conserta o histórico inteiro. Guardar o
+ * custo na linha do pedido deixaria toda venda anterior com margem falsa e
+ * exigiria um backfill.
+ */
+export async function setProductCosts(input: {
+  productId: string;
+  cost: number;
+  extraCost: number;
+  clientId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  if (!Number.isFinite(input.cost) || input.cost < 0) return { ok: false, message: "Custo inválido." };
+  if (!Number.isFinite(input.extraCost) || input.extraCost < 0) {
+    return { ok: false, message: "Custo extra inválido." };
+  }
+
+  // O escopo entra no próprio update: sem isso, trocar o id na requisição
+  // deixaria alguém editar o custo de um produto de outro lojista.
+  const { count } = await prisma.product.updateMany({
+    where: { id: input.productId, account: { clientId: input.clientId } },
+    data: { cost: input.cost, extraCost: input.extraCost },
+  });
+
+  return count === 1 ? { ok: true } : { ok: false, message: "Produto não encontrado." };
+}
+
 /** Produto criado à mão (sem anúncio no marketplace). O sync não toca nele. */
 export async function createManualProduct(input: {
   accountId: string;

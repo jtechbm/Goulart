@@ -95,6 +95,44 @@ export async function limparFalhas(email: string): Promise<void> {
   });
 }
 
+/**
+ * Limite por IP para uma ação qualquer — hoje, o cadastro.
+ *
+ * Diferente do login, aqui **toda** chamada conta, não só a que falha: o abuso
+ * de um cadastro aberto é justamente criar muitas contas com sucesso. Sem
+ * confirmação por e-mail, este contador é o que segura a enxurrada.
+ */
+export async function consumirPorIp(acao: string, limite: number): Promise<Veredito> {
+  const agora = new Date();
+  const key = `${acao}:${await ipDaRequisicao()}`;
+  const atual = await prisma.loginAttempt.findUnique({ where: { key } });
+
+  if (atual?.blockedUntil && atual.blockedUntil > agora) {
+    return { permitido: false, segundos: Math.ceil((atual.blockedUntil.getTime() - agora.getTime()) / 1000) };
+  }
+
+  if (!atual || agora.getTime() - atual.windowAt.getTime() > JANELA_MS) {
+    await prisma.loginAttempt.upsert({
+      where: { key },
+      create: { key, attempts: 1, windowAt: agora },
+      update: { attempts: 1, windowAt: agora, blockedUntil: null },
+    });
+    return { permitido: true };
+  }
+
+  const attempts = atual.attempts + 1;
+  const estourou = attempts > limite;
+  await prisma.loginAttempt.update({
+    where: { key },
+    data: {
+      attempts,
+      blockedUntil: estourou ? new Date(agora.getTime() + BLOQUEIO_MS) : atual.blockedUntil,
+    },
+  });
+
+  return estourou ? { permitido: false, segundos: Math.ceil(BLOQUEIO_MS / 1000) } : { permitido: true };
+}
+
 /** Higiene: some com janelas vencidas que ninguém vai mais consultar. */
 export async function limparTentativasAntigas(): Promise<number> {
   const { count } = await prisma.loginAttempt.deleteMany({

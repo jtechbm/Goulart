@@ -1,4 +1,4 @@
-// JtechDash — schema multi-marketplace
+// ArtSul Decorações — schema multi-marketplace
 
 generator client {
   provider        = "prisma-client-js"
@@ -127,15 +127,57 @@ model Order {
   status     String
   currency   String   @default("BRL")
   gross      Float    @default(0) // valor bruto do pedido
-  fees       Float    @default(0) // comissão do marketplace
-  shipping   Float    @default(0)
+  /// Total retido pelo marketplace. Redundante com a quebra abaixo de
+  /// propósito: é o que alimenta o agregado diário sem precisar somar tudo.
+  fees       Float    @default(0)
   itemsCount Int      @default(0)
   buyerRef   String?
   placedAt   DateTime
   raw        String? // payload original (JSON)
 
+  // Quebra do que o marketplace reteve. Cada plataforma usa um subconjunto:
+  // o ML cobra comissão e frete; a Shopee soma taxa de serviço e de cartão.
+  commission Float @default(0) // comissão sobre a venda
+  shipping   Float @default(0) // frete pago pelo vendedor
+  serviceFee Float @default(0) // taxa de serviço (Shopee)
+  cardFee    Float @default(0) // taxa de cartão de crédito
+  /// Crédito, não custo: entra somando no líquido (moedas/cashback da Shopee).
+  coins      Float @default(0)
+
+  /// Como foi enviado — "Mercado Envios", "Full", "Shopee Xpress".
+  shippingMode String?
+
+  items OrderItem[]
+
   @@unique([accountId, externalId])
   @@index([accountId, placedAt])
+}
+
+/// Linha de um pedido. É aqui que lucro e margem são calculados: o pedido
+/// inteiro pode fechar no azul enquanto um item específico dá prejuízo, e é
+/// esse item que o lojista precisa enxergar.
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Nulo quando o anúncio não foi casado com nenhum produto do cadastro —
+  /// sem isso não há custo, e portanto não há margem. É o que a tela avisa
+  /// como "venda sem produto vinculado".
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  externalItemId String
+  sku            String?
+  title          String
+  quantity       Int    @default(1)
+  unitPrice      Float  @default(0)
+  total          Float  @default(0)
+  /// Parte da retenção do marketplace que cabe a esta linha.
+  fees           Float  @default(0)
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 /// Anúncio/produto da loja — a base da tela de estoque.
@@ -160,11 +202,19 @@ model Product {
   /// MANUAL = criado aqui dentro; o sync não sobrescreve nem apaga.
   origin String @default("SYNCED")
 
+  /// Quanto custa para você adquirir uma unidade. Não vem de API nenhuma —
+  /// é o lojista que informa, e sem ele não existe lucro nem margem.
+  cost Float @default(0)
+
+  /// Custo por unidade que não é o produto em si: embalagem, etiqueta, brinde.
+  extraCost Float @default(0)
+
   /// Identificadores da plataforma necessários para escrever estoque de volta
   /// (model_id da Shopee, sku_id + warehouse_id do TikTok). JSON.
   meta String?
 
-  movements StockMovement[]
+  movements  StockMovement[]
+  orderItems OrderItem[]
 
   @@unique([accountId, externalId])
   @@index([accountId, stock])

@@ -18,3 +18,4 @@ tsconfig.tsbuildinfo
 
 # backup pontual do banco (contem hashes de senha e tokens cifrados)
 backup-pre-migracao.json
+artsul.png
