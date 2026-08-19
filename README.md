@@ -1,4 +1,4 @@
-# ArtSul Decorações
+# JtechERP
 
 Sistema de gestão multi-marketplace do lojista: **Mercado Livre**, **Shopee** e
 **TikTok Shop** em um lugar só — faturamento, lojas conectadas, estoque (que o próprio

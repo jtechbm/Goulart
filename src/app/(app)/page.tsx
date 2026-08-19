@@ -1,12 +1,14 @@
 import { DollarSign, PackageX, ShoppingCart, Store, TicketPercent } from "lucide-react";
 import Link from "next/link";
 import { RevenueLine } from "@/components/charts";
+import { PrimeirosPassos } from "@/components/PrimeirosPassos";
 import { Topbar } from "@/components/Topbar";
 import { Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { brl, num } from "@/lib/format";
 import { LOW_STOCK } from "@/lib/inventory";
+import { progressoDoLojista } from "@/lib/onboarding";
 import { accountRollups, revenueSeries, WINDOW_DAYS } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +16,13 @@ export const dynamic = "force-dynamic";
 export default async function InicioPage() {
   const user = await requireClient();
 
-  const [rollups, series, lowStock] = await Promise.all([
+  const [rollups, series, lowStock, progresso] = await Promise.all([
     accountRollups(user.clientId, WINDOW_DAYS),
     revenueSeries(user.clientId, WINDOW_DAYS),
     prisma.product.count({
       where: { account: { clientId: user.clientId }, stock: { lte: LOW_STOCK } },
     }),
+    progressoDoLojista(user.clientId),
   ]);
 
   const revenue = rollups.reduce((s, r) => s + r.revenue, 0);
@@ -36,6 +39,8 @@ export default async function InicioPage() {
           title={`Olá, ${user.name.split(" ")[0]}`}
           subtitle={`Resumo das suas lojas nos últimos ${WINDOW_DAYS} dias.`}
         />
+
+        <PrimeirosPassos progresso={progresso} />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat

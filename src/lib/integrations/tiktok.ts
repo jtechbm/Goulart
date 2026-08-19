@@ -74,7 +74,7 @@ async function api<T>(
   const json = (await res.json().catch(() => ({}))) as TTEnvelope<T>;
   // code 0 = sucesso; qualquer outro é erro de negócio, ainda que HTTP 200
   if (!res.ok || (json.code ?? 0) !== 0) {
-    throw new IntegrationError("TIKTOK_SHOP", `${path} falhou: code=${json.code} ${json.message ?? res.status}`, json);
+    throw new IntegrationError("TIKTOK_SHOP", `${path} falhou: code=${json.code} ${json.message ?? res.status}`, json, res.status);
   }
   return json.data as T;
 }
@@ -91,7 +91,7 @@ async function tokenCall(path: string, query: Record<string, string>): Promise<T
 
   const json = (await res.json().catch(() => ({}))) as TTEnvelope<Record<string, unknown>>;
   if (!res.ok || (json.code ?? 0) !== 0 || !json.data) {
-    throw new IntegrationError("TIKTOK_SHOP", `${path} falhou: ${json.message ?? res.status}`, json);
+    throw new IntegrationError("TIKTOK_SHOP", `${path} falhou: ${json.message ?? res.status}`, json, res.status);
   }
 
   const d = json.data;

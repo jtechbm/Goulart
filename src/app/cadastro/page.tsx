@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { comAviso, createSession, currentUser, hashPassword, homeFor } from "@/lib/auth";
-import { larguraPara, LOGO_ALT, LOGO_ALTURA_LOGIN, LOGO_SRC } from "@/lib/brand";
+import { Marca } from "@/components/Logo";
+import { LOGO_ALTURA_LOGIN } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { consumirPorIp } from "@/lib/rateLimit";
 
@@ -85,14 +85,7 @@ export default async function CadastroPage({
     <main className="grid min-h-dvh place-items-center px-6 py-12">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Image
-            src={LOGO_SRC}
-            alt={LOGO_ALT}
-            width={larguraPara(LOGO_ALTURA_LOGIN)}
-            height={LOGO_ALTURA_LOGIN}
-            priority
-            className="h-[76px] w-auto max-w-full object-contain"
-          />
+          <Marca altura={LOGO_ALTURA_LOGIN} priority tamanhoNome="text-2xl" />
           <h1 className="mt-3 text-2xl font-bold text-ink">Criar conta</h1>
           <p className="mt-1 text-sm text-ink-2">Conecte suas lojas e acompanhe tudo em um lugar.</p>
         </div>
@@ -144,6 +137,11 @@ export default async function CadastroPage({
             Entrar
           </Link>
         </p>
+
+        <nav className="mt-8 flex justify-center gap-4 text-xs text-ink-muted">
+          <Link href="/termos" className="hover:text-ink-2">Termos de uso</Link>
+          <Link href="/privacidade" className="hover:text-ink-2">Privacidade</Link>
+        </nav>
       </div>
     </main>
   );

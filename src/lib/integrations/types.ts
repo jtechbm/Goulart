@@ -110,6 +110,16 @@ export class IntegrationError extends Error {
     public platform: Platform,
     message: string,
     public detail?: unknown,
+    /**
+     * Código HTTP da resposta, quando houve uma.
+     *
+     * Fica em campo próprio e não só no texto porque quem decide se vale a pena
+     * tentar de novo precisa do número: 503 é a plataforma tropeçando e passa,
+     * 401 é autorização revogada e vai falhar igual para sempre. As três
+     * plataformas escrevem a mensagem em formatos diferentes, então ler o
+     * código de dentro do texto quebraria na primeira mudança de formato.
+     */
+    public status?: number,
   ) {
     super(`[${platform}] ${message}`);
     this.name = "IntegrationError";

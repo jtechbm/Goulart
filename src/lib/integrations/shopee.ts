@@ -74,7 +74,7 @@ async function call<T extends ShopeeEnvelope>(
   const json = (await res.json().catch(() => ({}))) as T;
   // A Shopee devolve HTTP 200 mesmo em erro de negócio: o campo `error` é a fonte da verdade.
   if (!res.ok || (json.error && json.error !== "")) {
-    throw new IntegrationError("SHOPEE", `${path} falhou: ${json.error || res.status} ${json.message ?? ""}`, json);
+    throw new IntegrationError("SHOPEE", `${path} falhou: ${json.error || res.status} ${json.message ?? ""}`, json, res.status);
   }
   return json;
 }

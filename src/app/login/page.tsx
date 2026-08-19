@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { comAviso, createSession, currentUser, homeFor, verifyPassword } from "@/lib/auth";
-import { APP_TAGLINE, larguraPara, LOGO_ALT, LOGO_ALTURA_LOGIN, LOGO_SRC } from "@/lib/brand";
+import { Marca } from "@/components/Logo";
+import { APP_TAGLINE, LOGO_ALTURA_LOGIN } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { checarLimite, limparFalhas, registrarFalha } from "@/lib/rateLimit";
 
@@ -60,16 +60,8 @@ export default async function LoginPage({
     <main className="grid min-h-dvh place-items-center px-6 py-12">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex flex-col items-center text-center">
-          {/* A logo é um wordmark: já diz o nome, então não há <h1> repetindo. */}
           <h1>
-            <Image
-              src={LOGO_SRC}
-              alt={LOGO_ALT}
-              width={larguraPara(LOGO_ALTURA_LOGIN)}
-              height={LOGO_ALTURA_LOGIN}
-              priority
-              className="h-[76px] w-auto max-w-full object-contain"
-            />
+            <Marca altura={LOGO_ALTURA_LOGIN} priority tamanhoNome="text-2xl" />
           </h1>
           <p className="mt-3 text-sm text-ink-2">{APP_TAGLINE}</p>
         </div>
@@ -133,6 +125,10 @@ export default async function LoginPage({
             Criar conta
           </Link>
         </p>
+        <nav className="mt-8 flex justify-center gap-4 text-xs text-ink-muted">
+          <Link href="/termos" className="hover:text-ink-2">Termos de uso</Link>
+          <Link href="/privacidade" className="hover:text-ink-2">Privacidade</Link>
+        </nav>
       </div>
     </main>
   );

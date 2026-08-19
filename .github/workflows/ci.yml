@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Nada aqui toca banco de verdade. O `prisma generate` só lê o schema, e
+      # o build do Next não abre conexão porque toda página é force-dynamic.
+      # Valores de fachada para as variáveis que o código exige na importação.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      # 32 bytes em base64 — exigência do AES-256-GCM.
+      ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      CRON_SECRET: ci
+      APP_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar
+        run: npm ci
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes
+        run: npm test
+
+      # Por último porque é o passo mais lento: se tipo ou teste quebrou,
+      # o retorno chega antes de esperar o build inteiro.
+      - name: Build
+        run: npm run build

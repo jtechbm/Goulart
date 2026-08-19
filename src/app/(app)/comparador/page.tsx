@@ -4,7 +4,7 @@ import { BuscarPrecosBotao } from "@/components/BuscarPrecosBotao";
 import { Topbar } from "@/components/Topbar";
 import { Card, CardHeader, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { supportsAiSearch } from "@/lib/aiMarketSearch";
-import { requireClient } from "@/lib/auth";
+import { requireRecurso } from "@/lib/planGuard";
 import { prisma } from "@/lib/db";
 import { brl, relative, variation } from "@/lib/format";
 import { searchCompetitors, supportsAutoSearch } from "@/lib/marketSearch";
@@ -29,7 +29,9 @@ export default async function ComparadorPage({
 }: {
   searchParams: Promise<{ produto?: string }>;
 }) {
-  const user = await requireClient();
+  // Tela do plano Pro: a trava é aqui, no servidor. Esconder o item do
+  // menu é conveniência visual, nunca controle de acesso — a URL é pública.
+  const { user } = await requireRecurso("comparador");
   const sp = await searchParams;
   const productId = sp.produto ?? "";
 

@@ -50,6 +50,19 @@ export type SessionUser = {
   email: string;
   clientId: string | null;
   clientName: string | null;
+  /**
+   * Assinatura do cliente, crua. Vem no MESMO join da sessão de propósito: o
+   * layout precisa dela em toda navegação, e buscá-la à parte custava uma
+   * segunda ida ao banco por página — de São Paulo é barato, mas cada ida a
+   * mais é uma trave de latência empilhada antes de a tela começar a montar.
+   */
+  subscription: {
+    plan: string;
+    status: string;
+    trialEndsAt: Date | null;
+    currentPeriodEnd: Date | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
 };
 
 /**
@@ -69,7 +82,26 @@ export const currentUser = cache(async function currentUser(): Promise<SessionUs
     // consulta mais quente do sistema: roda em toda navegação.
     relationLoadStrategy: "join",
     where: { token },
-    include: { user: { include: { client: { select: { name: true } } } } },
+    include: {
+      user: {
+        include: {
+          client: {
+            select: {
+              name: true,
+              subscription: {
+                select: {
+                  plan: true,
+                  status: true,
+                  trialEndsAt: true,
+                  currentPeriodEnd: true,
+                  cancelAtPeriodEnd: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!session || session.expiresAt < new Date() || !session.user.active) return null;
@@ -81,6 +113,7 @@ export const currentUser = cache(async function currentUser(): Promise<SessionUs
     email: u.email,
     clientId: u.clientId,
     clientName: u.client?.name ?? null,
+    subscription: u.client?.subscription ?? null,
   };
 });
 

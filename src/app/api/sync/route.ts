@@ -8,6 +8,46 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
+ * GET /api/sync — porta do agendador.
+ *
+ * O Vercel Cron chama a rota com **GET** (nunca POST) e manda o `CRON_SECRET`
+ * no `authorization`. Sem este handler o agendamento configurado em
+ * `vercel.json` bateria em 405 a cada disparo, e ninguém perceberia: o cron
+ * não avisa que falhou, os pedidos é que simplesmente parariam de entrar.
+ *
+ * Aqui não há sessão nenhuma: ou vem o segredo certo, ou é 401. Se
+ * `CRON_SECRET` não estiver definido, a rota fecha em vez de abrir.
+ */
+export async function GET(req: Request) {
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const days = janela(url.searchParams.get("days"));
+
+  // Faxina junto: sessão vencida e contador de login velho não valem um
+  // agendamento só para eles, e sem isso as duas tabelas só crescem.
+  await Promise.all([cleanupExpiredSessions(), limparTentativasAntigas()]);
+
+  const results = await syncAll(days, null);
+  const failed = results.filter((r) => !r.ok).length;
+  return NextResponse.json(
+    { days, ok: results.length - failed, failed, results },
+    // 207 quando alguma loja falhou: o log da Vercel destaca o disparo,
+    // em vez de mostrar tudo verde com contas quebradas dentro.
+    { status: failed > 0 ? 207 : 200 },
+  );
+}
+
+/** Janela de dias aceita, com padrão de 30. */
+function janela(bruto: string | null): number {
+  return Math.min(365, Math.max(1, Number(bruto ?? 30) || 30));
+}
+
+/**
  * POST /api/sync              -> sincroniza as lojas de quem chamou
  * POST /api/sync?account=<id> -> sincroniza uma loja
  * POST /api/sync?days=60      -> janela de dias (padrão 30)
@@ -36,7 +76,7 @@ export async function POST(req: Request) {
     scopeClientId = user.clientId;
   }
 
-  const days = Math.min(365, Math.max(1, Number(url.searchParams.get("days") ?? 30)));
+  const days = janela(url.searchParams.get("days"));
   const accountId = url.searchParams.get("account");
 
   if (accountId) {

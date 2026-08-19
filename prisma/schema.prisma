@@ -1,4 +1,4 @@
-// ArtSul Decorações — schema multi-marketplace
+// JtechERP — schema multi-marketplace
 
 generator client {
   provider        = "prisma-client-js"
@@ -37,7 +37,8 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  sessions Session[]
+  sessions       Session[]
+  passwordResets PasswordReset[]
 
   @@index([clientId])
 }
@@ -70,8 +71,13 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  accounts Account[]
-  users    User[]
+  accounts      Account[]
+  users         User[]
+  customers     Customer[]
+  financeries   FinanceEntry[]
+  conversations Conversation[]
+  settings      Settings?
+  subscription  Subscription?
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +153,10 @@ model Order {
   /// Como foi enviado — "Mercado Envios", "Full", "Shopee Xpress".
   shippingMode String?
 
+  /// Comprador, quando a venda é do canal próprio/atacado em vez do marketplace.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
   items OrderItem[]
 
   @@unique([accountId, externalId])
@@ -170,11 +180,11 @@ model OrderItem {
   externalItemId String
   sku            String?
   title          String
-  quantity       Int    @default(1)
-  unitPrice      Float  @default(0)
-  total          Float  @default(0)
+  quantity       Int     @default(1)
+  unitPrice      Float   @default(0)
+  total          Float   @default(0)
   /// Parte da retenção do marketplace que cabe a esta linha.
-  fees           Float  @default(0)
+  fees           Float   @default(0)
 
   @@index([orderId])
   @@index([productId])
@@ -208,6 +218,12 @@ model Product {
 
   /// Custo por unidade que não é o produto em si: embalagem, etiqueta, brinde.
   extraCost Float @default(0)
+
+  /// Preço e pedido mínimo do canal de atacado. Criados pelo time no banco;
+  /// nosso código ainda não os usa, mas precisam estar aqui — schema que não
+  /// descreve o banco transforma `db push` numa armadilha.
+  wholesalePrice  Float?
+  wholesaleMinQty Int    @default(1)
 
   /// Identificadores da plataforma necessários para escrever estoque de volta
   /// (model_id da Shopee, sku_id + warehouse_id do TikTok). JSON.
@@ -319,10 +335,10 @@ model MarketComparison {
 /// instância diferente, e um contador em RAM zera a cada cold start — não
 /// limitaria nada.
 model LoginAttempt {
-  key      String   @id
-  attempts Int      @default(0)
+  key          String    @id
+  attempts     Int       @default(0)
   /// Início da janela corrente. Passou da janela, o contador recomeça.
-  windowAt DateTime @default(now())
+  windowAt     DateTime  @default(now())
   /// Preenchido quando estourou o limite; até lá, o login é recusado.
   blockedUntil DateTime?
 
@@ -338,4 +354,198 @@ model OAuthState {
   verifier  String? // PKCE (Mercado Livre)
   createdAt DateTime @default(now())
   expiresAt DateTime
+}
+
+// ---------------------------------------------------------------------------
+// Módulos construídos por outra pessoa do time
+//
+// Estes modelos existem no banco e ainda não têm tela no nosso código. Estão
+// declarados aqui por um motivo prático: `prisma db push` faz o banco espelhar
+// este arquivo, então tudo que não estivesse descrito seria APAGADO no primeiro
+// push — cinco tabelas e as colunas de atacado junto.
+// ---------------------------------------------------------------------------
+
+/// Cliente final e fornecedor do lojista (`kind`), fora dos marketplaces.
+model Customer {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  kind     String  @default("CLIENTE")
+  name     String
+  document String?
+  email    String?
+  phone    String?
+  city     String?
+  uf       String?
+  notes    String?
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders         Order[]
+  financeEntries FinanceEntry[]
+
+  @@index([clientId, kind])
+}
+
+/// Lançamento financeiro avulso — o que entra e sai fora do repasse do
+/// marketplace (despesa operacional, receita extra, conta a pagar).
+model FinanceEntry {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  kind        String
+  category    String
+  description String
+  amount      Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  method      String?
+  platform    String?
+  recurring   Boolean   @default(false)
+  notes       String?
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  orderId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId, kind, dueDate])
+}
+
+/// Atendimento com o comprador, por marketplace.
+model Conversation {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  platform       String
+  customerName   String
+  customerHandle String?
+  status         String   @default("ABERTA")
+  lastMessageAt  DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  messages Message[]
+
+  @@index([clientId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  direction String
+  body      String
+  sentAt    DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([conversationId, sentAt])
+}
+
+/// Preferências por empresa. Substitui as constantes espalhadas no código —
+/// `taxRate` é a alíquota que hoje vive fixa em TAX_RATE, e `lowStockThreshold`
+/// o que está em LOW_STOCK.
+model Settings {
+  id       String @id @default(cuid())
+  clientId String @unique
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  companyName String?
+  document    String?
+  phone       String?
+  address     String?
+
+  taxRate           Float   @default(0.113)
+  defaultExtraCost  Float   @default(0)
+  lowStockThreshold Int     @default(5)
+  notifyLowStock    Boolean @default(true)
+  notifyFinance     Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Cobrança
+// ---------------------------------------------------------------------------
+
+/// Assinatura do lojista. Uma por Client, porque o acesso é um login por
+/// empresa. Os campos de status espelham o Stripe de propósito: o Stripe é a
+/// fonte da verdade sobre quem pagou, e este registro é um cache local para
+/// não consultar a API deles a cada carregamento de página.
+model Subscription {
+  id       String @id @default(cuid())
+  clientId String @unique
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  /// "BASICO" | "PRO" — a lista vale em src/lib/plans.ts.
+  plan String @default("BASICO")
+
+  /// "trialing" | "active" | "past_due" | "canceled" | "incomplete".
+  /// Só `trialing` e `active` liberam o sistema.
+  status String @default("trialing")
+
+  /// Fim do teste grátis. Enquanto estiver no futuro, libera tudo sem cartão.
+  trialEndsAt DateTime?
+
+  /// Fim do período já pago. É a data que decide o corte quando a renovação
+  /// falha: o lojista continua entrando até aqui, não até o dia da recusa.
+  currentPeriodEnd DateTime?
+
+  /// Cancelou, mas segue com acesso até o fim do período que já pagou.
+  cancelAtPeriodEnd Boolean @default(false)
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Eventos do Stripe já processados.
+///
+/// O Stripe reentrega o mesmo evento quando não recebe 200 depressa, e a ordem
+/// de chegada não é garantida. Sem esta trava, uma reentrega de
+/// `invoice.paid` poderia estender o período duas vezes — ou pior, um evento
+/// antigo chegando atrasado rebaixaria um plano que já foi elevado.
+model WebhookEvent {
+  /// O próprio `event.id` do Stripe: a chave de idempotência vem deles.
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Recuperação de senha
+// ---------------------------------------------------------------------------
+
+/// Pedido de "esqueci minha senha".
+///
+/// Guardamos **só o hash** do token, nunca ele mesmo: quem lesse o banco
+/// poderia trocar a senha de qualquer conta se o valor estivesse em claro —
+/// seria uma segunda porta de entrada, tão boa quanto a senha.
+model PasswordReset {
+  id        String @id @default(cuid())
+  tokenHash String @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  /// Marcado no primeiro uso: o link vale uma vez só.
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

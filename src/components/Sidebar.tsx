@@ -1,27 +1,42 @@
 "use client";
 
-import { Boxes, DollarSign, FileText, LayoutDashboard, Plug, Receipt, Scale, Store } from "lucide-react";
-import Image from "next/image";
+import { Boxes, DollarSign, FileText, LayoutDashboard, Lock, Plug, Receipt, Scale, Store } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { larguraPara, LOGO_ALT, LOGO_ALTURA_MENU, LOGO_SRC } from "@/lib/brand";
+import { planoInclui, type Plano, type Recurso } from "@/lib/plans";
+import { Marca } from "./Logo";
 import { NavLink } from "./NavLink";
 import { useSidebar } from "./SidebarContext";
 
-/** Menu do lojista. Tudo aqui é escopo do próprio cliente logado. */
-const NAV = [
+/**
+ * Menu do lojista. Tudo aqui é escopo do próprio cliente logado.
+ *
+ * `recurso` marca o item que pertence ao plano Pro. O cadeado é só sinalização:
+ * quem bloqueia de verdade é `requireRecurso` dentro da página, porque digitar
+ * a URL na barra de endereço ignora qualquer coisa que o menu faça.
+ */
+const NAV: Array<{ href: string; label: string; Icon: typeof LayoutDashboard; recurso?: Recurso }> = [
   { href: "/", label: "Início", Icon: LayoutDashboard },
   { href: "/vendas", label: "Vendas", Icon: Receipt },
   { href: "/faturamento", label: "Faturamento", Icon: DollarSign },
-  { href: "/relatorios", label: "Relatórios", Icon: FileText },
-  { href: "/comparador", label: "Comparador de preços", Icon: Scale },
+  { href: "/relatorios", label: "Relatórios", Icon: FileText, recurso: "relatorios" },
+  { href: "/comparador", label: "Comparador de preços", Icon: Scale, recurso: "comparador" },
   { href: "/lojas", label: "Minhas lojas", Icon: Store },
   { href: "/estoque", label: "Estoque", Icon: Boxes },
   { href: "/integracoes", label: "Integrações", Icon: Plug },
 ];
 
-export function Sidebar({ subtitle }: { subtitle: string }) {
+export function Sidebar({
+  subtitle,
+  plano,
+  diasDeTeste,
+}: {
+  subtitle: string;
+  plano: Plano;
+  /** Preenchido só durante o teste grátis. */
+  diasDeTeste: number | null;
+}) {
   const pathname = usePathname();
   const { open, close } = useSidebar();
 
@@ -42,40 +57,55 @@ export function Sidebar({ subtitle }: { subtitle: string }) {
         }`}
       >
         <Link href="/" className="block px-5 py-6">
-          <Image
-            src={LOGO_SRC}
-            alt={LOGO_ALT}
-            width={larguraPara(LOGO_ALTURA_MENU)}
-            height={LOGO_ALTURA_MENU}
-            priority
-            className="h-11 w-auto max-w-full object-contain object-left"
-          />
+          <Marca priority />
+          {/* Abaixo da marca do produto vem a loja em que voce esta:
+              e o endereco do multi-tenant, nao um segundo nome do sistema. */}
           <span className="mt-2 block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
             {subtitle}
           </span>
         </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-          {NAV.map(({ href, label, Icon }) => {
+          {NAV.map(({ href, label, Icon, recurso }) => {
             // "/" casa com tudo em startsWith — a home só fica ativa no exato.
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+            const travado = recurso != null && !planoInclui(plano, recurso);
+
             return (
               <NavLink
                 key={href}
-                href={href}
-                active={active}
+                href={travado ? `/assinatura?recurso=${recurso}` : href}
+                active={active && !travado}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                  active
+                  active && !travado
                     ? "bg-brand-soft font-semibold text-brand"
                     : "font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
                 }`}
               >
                 <Icon size={18} aria-hidden />
-                {label}
+                <span className={travado ? "text-ink-muted" : undefined}>{label}</span>
+                {travado && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-ink-muted">
+                    <Lock size={11} aria-hidden />
+                    Pro
+                  </span>
+                )}
               </NavLink>
             );
           })}
         </nav>
+
+        {diasDeTeste != null && (
+          <Link
+            href="/assinatura"
+            className="mx-3 mb-4 block rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-xs transition-colors hover:border-brand"
+          >
+            <span className="block font-semibold text-ink">
+              {diasDeTeste === 1 ? "Último dia de teste" : `${diasDeTeste} dias de teste`}
+            </span>
+            <span className="mt-0.5 block text-ink-muted">Escolher um plano →</span>
+          </Link>
+        )}
       </aside>
     </>
   );

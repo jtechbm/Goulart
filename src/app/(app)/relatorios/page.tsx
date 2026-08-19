@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
 import { Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
-import { requireClient } from "@/lib/auth";
+import { requireRecurso } from "@/lib/planGuard";
 import { brl, date, num } from "@/lib/format";
 import { gerarRelatorio } from "@/lib/reports";
 import { faixaMargem } from "@/lib/sales";
@@ -18,7 +18,9 @@ export default async function RelatoriosPage({
 }: {
   searchParams: Promise<{ dias?: string }>;
 }) {
-  const user = await requireClient();
+  // Tela do plano Pro: a trava é aqui, no servidor. Esconder o item do
+  // menu é conveniência visual, nunca controle de acesso — a URL é pública.
+  const { user } = await requireRecurso("relatorios");
   const sp = await searchParams;
   const dias = PERIODOS.some((d) => String(d) === sp.dias) ? Number(sp.dias) : 30;
 

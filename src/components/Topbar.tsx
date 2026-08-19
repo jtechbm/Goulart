@@ -1,4 +1,4 @@
-import { KeyRound, LogOut } from "lucide-react";
+import { KeyRound, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { logout } from "@/lib/actions";
@@ -39,13 +39,22 @@ export async function Topbar({ crumb }: { crumb: string }) {
           <Avatar name={user.name} />
           <span className="hidden leading-tight sm:block">
             <span className="block text-sm font-semibold text-ink">{user.name}</span>
-            {/* Quando o nome de quem entrou já é o da empresa, repetir "ArtSul"
-                sobre "ArtSul Decorações" não informa nada — o e-mail sim, que
-                diz em qual acesso você está. */}
+            {/* Quando o nome de quem entrou ja e o da empresa, repetir "Jair"
+                sobre "Jair Comercio" nao informa nada — o e-mail sim, que
+                diz em qual acesso voce esta. */}
             <span className="block text-xs text-ink-muted">
               {segundaLinha(user.name, user.clientName, user.email)}
             </span>
           </span>
+
+          <Link
+            href="/conta"
+            aria-label="Meus dados"
+            title="Meus dados"
+            className="grid size-9 place-items-center rounded-full border border-line bg-surface-2 text-ink-2 transition-colors hover:text-ink"
+          >
+            <UserRound size={15} />
+          </Link>
 
           <Link
             href="/trocar-senha"

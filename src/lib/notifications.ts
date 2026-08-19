@@ -24,17 +24,30 @@ export async function notificationsFor(clientId: string): Promise<Notification[]
     prisma.product.count({ where: { account: { clientId }, stock: { gt: 0, lte: LOW_STOCK } } }),
     prisma.account.findMany({
       where: { clientId, status: { in: ["EXPIRED", "ERROR"] } },
-      select: { id: true, shopName: true, statusNote: true },
+      select: { id: true, shopName: true, status: true, statusNote: true, lastSyncAt: true },
       take: 20,
     }),
   ]);
 
   for (const loja of lojasComProblema) {
+    /**
+     * Os dois problemas exigem ações diferentes do lojista, então não podem
+     * usar o mesmo texto: EXPIRED ele resolve reautorizando a loja; ERROR é
+     * falha nossa ou da plataforma, e mandá-lo reconectar seria empurrá-lo a
+     * refazer um OAuth que já está bom.
+     */
+    const expirou = loja.status === "EXPIRED";
     items.push({
       id: `conta-${loja.id}`,
-      title: `${loja.shopName} precisa reconectar`,
-      detail: loja.statusNote ?? "A autorização com o marketplace caiu.",
-      href: "/integracoes",
+      title: expirou
+        ? `${loja.shopName} precisa reconectar`
+        : `${loja.shopName} não está sincronizando`,
+      detail:
+        loja.statusNote ??
+        (expirou
+          ? "A autorização com o marketplace caiu."
+          : "A última sincronização falhou. Tentaremos de novo na próxima hora."),
+      href: expirou ? "/integracoes" : "/lojas",
       severity: "CRITICO",
     });
   }

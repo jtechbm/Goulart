@@ -1,6 +1,8 @@
 import type { Account } from "@prisma/client";
 import { prisma } from "./db";
 import { adapterFor, type Platform } from "./integrations";
+import { log, mensagemDoErro } from "./log";
+import { comRetentativa, ehFalhaDeAutorizacao } from "./retry";
 import { validAccessToken } from "./tokens";
 
 export type SyncResult = {
@@ -28,22 +30,42 @@ export async function syncAccount(account: Account, days = 30): Promise<SyncResu
     platform: account.platform,
   };
 
-  const log = await prisma.syncLog.create({
+  const registro = await prisma.syncLog.create({
     data: { accountId: account.id, kind: "orders", ok: false },
   });
 
   try {
+    /**
+     * A renovação do token fica FORA da retentativa de propósito. No Mercado
+     * Livre o refresh token rotaciona a cada uso: se a renovação apenas
+     * demorasse e nós tentássemos de novo, a segunda chamada apresentaria um
+     * refresh token que a primeira já consumiu — e derrubaríamos a conexão da
+     * loja tentando consertá-la.
+     */
     const accessToken = await validAccessToken(account);
     const to = new Date();
     const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const orders = await adapterFor(account.platform as Platform).fetchOrders({
-      accessToken,
-      externalId: account.externalId,
-      shopCipher: account.shopCipher,
-      from,
-      to,
-    });
+    const orders = await comRetentativa(
+      () =>
+        adapterFor(account.platform as Platform).fetchOrders({
+          accessToken,
+          externalId: account.externalId,
+          shopCipher: account.shopCipher,
+          from,
+          to,
+        }),
+      {
+        aoRepetir: ({ tentativa, esperaMs, erro }) =>
+          log.aviso("sync.repetindo", {
+            accountId: account.id,
+            platform: account.platform,
+            tentativa,
+            esperaMs,
+            motivo: mensagemDoErro(erro),
+          }),
+      },
+    );
 
     for (const o of orders) {
       const data = {
@@ -77,20 +99,42 @@ export async function syncAccount(account: Account, days = 30): Promise<SyncResu
       },
     });
     await prisma.syncLog.update({
-      where: { id: log.id },
+      where: { id: registro.id },
       data: { ok: true, itemCount: orders.length, endedAt: new Date() },
     });
 
     return { ...base, ok: true, orders: orders.length };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = mensagemDoErro(err);
+
+    /**
+     * Marcar o `status` da conta é o que faz o alerta chegar ao lojista: o sino
+     * lista contas em EXPIRED/ERROR. Antes daqui só o `lastSyncNote` mudava, e
+     * uma loja podia passar semanas sem sincronizar sem ninguém ser avisado —
+     * o lojista só descobriria pelo faturamento que parou de crescer.
+     */
+    const precisaReconectar = ehFalhaDeAutorizacao(err);
     await prisma.syncLog.update({
-      where: { id: log.id },
+      where: { id: registro.id },
       data: { ok: false, message: message.slice(0, 500), endedAt: new Date() },
     });
     await prisma.account.update({
       where: { id: account.id },
-      data: { lastSyncAt: new Date(), lastSyncNote: `Erro: ${message.slice(0, 200)}` },
+      data: {
+        lastSyncAt: new Date(),
+        lastSyncNote: `Erro: ${message.slice(0, 200)}`,
+        status: precisaReconectar ? "EXPIRED" : "ERROR",
+        statusNote: precisaReconectar
+          ? "A autorização com o marketplace caiu. Reconecte a loja."
+          : message.slice(0, 200),
+      },
+    });
+
+    log.erro("sync.falhou", {
+      accountId: account.id,
+      platform: account.platform,
+      precisaReconectar,
+      mensagem: message,
     });
     return { ...base, ok: false, orders: 0, message };
   }
@@ -101,14 +145,18 @@ export async function syncAccount(account: Account, days = 30): Promise<SyncResu
  * estoque desatualiza, mas o financeiro continua correto.
  */
 export async function syncProducts(account: Account, accessToken: string) {
-  const log = await prisma.syncLog.create({ data: { accountId: account.id, kind: "products", ok: false } });
+  const registro = await prisma.syncLog.create({
+    data: { accountId: account.id, kind: "products", ok: false },
+  });
 
   try {
-    const products = await adapterFor(account.platform as Platform).fetchProducts({
-      accessToken,
-      externalId: account.externalId,
-      shopCipher: account.shopCipher,
-    });
+    const products = await comRetentativa(() =>
+      adapterFor(account.platform as Platform).fetchProducts({
+        accessToken,
+        externalId: account.externalId,
+        shopCipher: account.shopCipher,
+      }),
+    );
 
     const seen: string[] = [];
     for (const p of products) {
@@ -142,15 +190,21 @@ export async function syncProducts(account: Account, accessToken: string) {
     }
 
     await prisma.syncLog.update({
-      where: { id: log.id },
+      where: { id: registro.id },
       data: { ok: true, itemCount: products.length, endedAt: new Date() },
     });
     return products.length;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = mensagemDoErro(err);
     await prisma.syncLog.update({
-      where: { id: log.id },
+      where: { id: registro.id },
       data: { ok: false, message: message.slice(0, 500), endedAt: new Date() },
+    });
+    // Só o catálogo falhou; o financeiro do pedido já entrou. Registra e segue.
+    log.aviso("sync.produtos.falhou", {
+      accountId: account.id,
+      platform: account.platform,
+      mensagem: message,
     });
     return 0;
   }

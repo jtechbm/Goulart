@@ -18,4 +18,8 @@ tsconfig.tsbuildinfo
 
 # backup pontual do banco (contem hashes de senha e tokens cifrados)
 backup-pre-migracao.json
-artsul.png
+
+# fonte de logo solta na raiz: o asset que vale e public/logo.png
+image.png
+.vercel
+.env*

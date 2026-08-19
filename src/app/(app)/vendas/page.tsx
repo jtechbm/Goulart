@@ -75,7 +75,10 @@ export default async function VendasPage({
     const q = new URLSearchParams();
     if (dias !== 30) q.set("dias", String(dias));
     if (sp.loja) q.set("loja", sp.loja);
-    for (const [k, v] of Object.entries(extra)) v === undefined ? q.delete(k) : q.set(k, v);
+    for (const [k, v] of Object.entries(extra)) {
+      if (v === undefined) q.delete(k);
+      else q.set(k, v);
+    }
     const s = q.toString();
     return s ? `/vendas?${s}` : "/vendas";
   };

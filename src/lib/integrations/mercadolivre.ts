@@ -40,7 +40,7 @@ async function tokenRequest(body: Record<string, string>): Promise<TokenSet> {
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    throw new IntegrationError("MERCADO_LIVRE", `falha ao obter token (HTTP ${res.status})`, json);
+    throw new IntegrationError("MERCADO_LIVRE", `falha ao obter token (HTTP ${res.status})`, json, res.status);
   }
 
   const accessToken = String(json.access_token ?? "");
@@ -66,7 +66,7 @@ async function api<T>(path: string, accessToken: string): Promise<T> {
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new IntegrationError("MERCADO_LIVRE", `GET ${path} falhou (HTTP ${res.status})`, json);
+    throw new IntegrationError("MERCADO_LIVRE", `GET ${path} falhou (HTTP ${res.status})`, json, res.status);
   }
   return json as T;
 }
@@ -277,7 +277,7 @@ export const mercadoLivre: MarketplaceAdapter = {
 
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      throw new IntegrationError("MERCADO_LIVRE", `falha ao atualizar estoque (HTTP ${res.status})`, json);
+      throw new IntegrationError("MERCADO_LIVRE", `falha ao atualizar estoque (HTTP ${res.status})`, json, res.status);
     }
   },
 };
