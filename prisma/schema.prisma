@@ -71,13 +71,13 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  accounts      Account[]
-  users         User[]
-  customers     Customer[]
-  financeries   FinanceEntry[]
-  conversations Conversation[]
-  settings      Settings?
-  subscription  Subscription?
+  accounts       Account[]
+  users          User[]
+  customers      Customer[]
+  financeEntries FinanceEntry[]
+  conversations  Conversation[]
+  settings       Settings?
+  subscription   Subscription?
 }
 
 // ---------------------------------------------------------------------------
@@ -153,9 +153,9 @@ model Order {
   /// Como foi enviado — "Mercado Envios", "Full", "Shopee Xpress".
   shippingMode String?
 
-  /// Comprador, quando a venda é do canal próprio/atacado em vez do marketplace.
+  /// Só preenchido em pedidos da conta ATACADO — quem comprou.
   customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id])
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   items OrderItem[]
 
@@ -219,9 +219,9 @@ model Product {
   /// Custo por unidade que não é o produto em si: embalagem, etiqueta, brinde.
   extraCost Float @default(0)
 
-  /// Preço e pedido mínimo do canal de atacado. Criados pelo time no banco;
-  /// nosso código ainda não os usa, mas precisam estar aqui — schema que não
-  /// descreve o banco transforma `db push` numa armadilha.
+  /// Nulo = produto não está no catálogo de atacado. Preenchido = aparece em
+  /// /atacado, vendável pela conta ATACADO, baixando do mesmo estoque — não
+  /// duplica produto entre varejo e atacado.
   wholesalePrice  Float?
   wholesaleMinQty Int    @default(1)
 
@@ -357,23 +357,20 @@ model OAuthState {
 }
 
 // ---------------------------------------------------------------------------
-// Módulos construídos por outra pessoa do time
-//
-// Estes modelos existem no banco e ainda não têm tela no nosso código. Estão
-// declarados aqui por um motivo prático: `prisma db push` faz o banco espelhar
-// este arquivo, então tudo que não estivesse descrito seria APAGADO no primeiro
-// push — cinco tabelas e as colunas de atacado junto.
+// Atacado, financeiro, chat e configurações
 // ---------------------------------------------------------------------------
 
-/// Cliente final e fornecedor do lojista (`kind`), fora dos marketplaces.
+/// Cliente ou fornecedor do lojista — usado no Atacado (quem compra) e em
+/// Gerenciamento (cadastro e contato). `kind` decide onde aparece; a mesma
+/// tabela serve os dois porque os campos são idênticos.
 model Customer {
   id       String @id @default(cuid())
   clientId String
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  kind     String  @default("CLIENTE")
+  kind     String  @default("CLIENTE") // CLIENTE | FORNECEDOR
   name     String
-  document String?
+  document String? // CNPJ/CPF
   email    String?
   phone    String?
   city     String?
@@ -390,27 +387,33 @@ model Customer {
   @@index([clientId, kind])
 }
 
-/// Lançamento financeiro avulso — o que entra e sai fora do repasse do
-/// marketplace (despesa operacional, receita extra, conta a pagar).
+/// Lançamento financeiro — a receber, a pagar, despesa ou repasse de
+/// marketplace. Status (pago/pendente/atrasado) é sempre derivado de
+/// `paidAt`/`dueDate` na leitura (`src/lib/finance.ts`), nunca gravado: um
+/// status gravado envelhece sozinho e mentiria assim que a data vencesse.
 model FinanceEntry {
   id       String @id @default(cuid())
   clientId String
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  kind        String
-  category    String
+  kind        String // RECEBER | PAGAR
+  category    String // ver CATEGORIAS_PAGAR/CATEGORIAS_RECEBER em lib/finance.ts
   description String
   amount      Float
   dueDate     DateTime
   paidAt      DateTime?
-  method      String?
-  platform    String?
+  method      String? // PIX | BOLETO | CARTAO | TRANSFERENCIA
+  platform    String? // canal de origem, quando é repasse de marketplace
   recurring   Boolean   @default(false)
-  notes       String?
 
   customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id])
-  orderId    String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  /// Id do pedido de atacado que originou o lançamento, quando houver.
+  /// Sem relação Prisma de propósito — é só referência informativa, não
+  /// precisa de include/cascade.
+  orderId String?
+  notes   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -418,18 +421,20 @@ model FinanceEntry {
   @@index([clientId, kind, dueDate])
 }
 
-/// Atendimento com o comprador, por marketplace.
+/// Uma conversa do chat unificado — um contato em uma plataforma. Mensagens
+/// ficam em `Message`; o não-lido conta as mensagens IN sem `readAt`.
 model Conversation {
   id       String @id @default(cuid())
   clientId String
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  platform       String
+  platform       String // MERCADO_LIVRE | SHOPEE | TIKTOK_SHOP | SHEIN | ATACADO
   customerName   String
   customerHandle String?
-  status         String   @default("ABERTA")
+  status         String   @default("ABERTA") // ABERTA | RESOLVIDA
   lastMessageAt  DateTime @default(now())
-  createdAt      DateTime @default(now())
+
+  createdAt DateTime @default(now())
 
   messages Message[]
 
@@ -441,7 +446,7 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  direction String
+  direction String // IN | OUT
   body      String
   sentAt    DateTime  @default(now())
   readAt    DateTime?
@@ -449,9 +454,11 @@ model Message {
   @@index([conversationId, sentAt])
 }
 
-/// Preferências por empresa. Substitui as constantes espalhadas no código —
-/// `taxRate` é a alíquota que hoje vive fixa em TAX_RATE, e `lowStockThreshold`
-/// o que está em LOW_STOCK.
+/// Configurações da loja — uma linha por cliente. Alíquota, custo extra
+/// padrão e limite de estoque baixo passam a sair daqui em vez das
+/// constantes fixas de `queries.ts`/`inventory.ts`, que continuam existindo
+/// só como fallback quando ainda não há linha (`get-or-default`, nunca
+/// criada implicitamente fora de `salvarConfiguracoes`).
 model Settings {
   id       String @id @default(cuid())
   clientId String @unique
@@ -462,11 +469,12 @@ model Settings {
   phone       String?
   address     String?
 
-  taxRate           Float   @default(0.113)
-  defaultExtraCost  Float   @default(0)
-  lowStockThreshold Int     @default(5)
-  notifyLowStock    Boolean @default(true)
-  notifyFinance     Boolean @default(true)
+  taxRate           Float @default(0.113)
+  defaultExtraCost  Float @default(0)
+  lowStockThreshold Int   @default(5)
+
+  notifyLowStock Boolean @default(true)
+  notifyFinance  Boolean @default(true)
 
   updatedAt DateTime @updatedAt
 }

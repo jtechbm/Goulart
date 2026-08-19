@@ -37,23 +37,32 @@
   --critical: #d03b3b;
   --good-text: #0ca30c;
 
-  /* séries dos gráficos — steps do modo escuro */
+  /* séries dos gráficos — steps do modo escuro
+     slot 1 violeta · 2 laranja · 3 aqua · 4 azul · 5 vinho — ordem fixa,
+     validada com dataviz/scripts/validate_palette.js (contraste + daltonismo,
+     all-pairs). Não trocar sem revalidar. */
   --series-1: #9085e9;
   --series-2: #d95926;
   --series-3: #199e70;
+  --series-4: #007dab;
+  --series-5: #b53c90;
 
   /* cromo dos gráficos */
   --grid: #2c2c2a;
   --axis: #383835;
   --axis-ink: #898781;
 
-  /* badges dos marketplaces */
+  /* badges dos canais */
   --ml: #f2c94c;
   --ml-bg: rgba(242, 201, 76, 0.14);
   --shopee: #f2734c;
   --shopee-bg: rgba(242, 115, 76, 0.14);
   --tiktok: #e879b9;
   --tiktok-bg: rgba(232, 121, 185, 0.14);
+  --shein: #ef5b5b;
+  --shein-bg: rgba(239, 91, 91, 0.14);
+  --atacado: #8a97ab;
+  --atacado-bg: rgba(138, 151, 171, 0.16);
 }
 
 :root[data-theme="light"] {
@@ -86,6 +95,8 @@
   --series-1: #4a3aa7;
   --series-2: #eb6834;
   --series-3: #1baf7a;
+  --series-4: #006e93;
+  --series-5: #87007c;
 
   --grid: #e1e0d9;
   --axis: #c3c2b7;
@@ -97,6 +108,10 @@
   --shopee-bg: rgba(242, 115, 76, 0.16);
   --tiktok: #a8347c;
   --tiktok-bg: rgba(232, 121, 185, 0.16);
+  --shein: #b3231f;
+  --shein-bg: rgba(179, 35, 31, 0.14);
+  --atacado: #55606e;
+  --atacado-bg: rgba(85, 96, 110, 0.14);
 }
 
 @theme inline {
@@ -124,6 +139,8 @@
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

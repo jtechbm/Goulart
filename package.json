@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "criar-acesso": "tsx scripts/criar-acesso.ts",
     "postinstall": "prisma generate",
-    "dados-exemplo": "tsx scripts/dados-exemplo.ts"
+    "dados-exemplo": "tsx scripts/dados-exemplo.ts",
+    "dados-demo": "tsx scripts/dados-demo.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

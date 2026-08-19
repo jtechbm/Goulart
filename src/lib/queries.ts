@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { CANAIS, type Canal } from "./canais";
 import { prisma } from "./db";
 import { variation } from "./format";
 
@@ -126,18 +127,21 @@ export async function revenueSeries(clientId: string, days = WINDOW_DAYS) {
     orderBy: { day: "asc" },
   });
 
-  const byDay = new Map<number, { day: number; MERCADO_LIVRE: number; SHOPEE: number; TIKTOK_SHOP: number }>();
+  type Bucket = { day: number } & Record<Canal, number>;
+  const zeroCanais = () => Object.fromEntries(CANAIS.map((c) => [c, 0])) as Record<Canal, number>;
+
+  const byDay = new Map<number, Bucket>();
   for (let i = 0; i <= days; i++) {
     const d = new Date(from.getTime() + i * 86400000);
     const key = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-    byDay.set(key, { day: key, MERCADO_LIVRE: 0, SHOPEE: 0, TIKTOK_SHOP: 0 });
+    byDay.set(key, { day: key, ...zeroCanais() });
   }
 
   for (const r of rows) {
     const key = Date.UTC(r.day.getUTCFullYear(), r.day.getUTCMonth(), r.day.getUTCDate());
     const bucket = byDay.get(key);
     if (!bucket) continue;
-    const p = r.account.platform as "MERCADO_LIVRE" | "SHOPEE" | "TIKTOK_SHOP";
+    const p = r.account.platform as Canal;
     if (p in bucket) bucket[p] += r.revenue;
   }
 

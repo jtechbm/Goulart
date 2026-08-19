@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarProvider } from "@/components/SidebarContext";
 import { requireAssinatura } from "@/lib/planGuard";
+import { totalNaoLidas } from "@/lib/chat";
 
 /**
  * Shell do sistema.
@@ -13,6 +14,7 @@ import { requireAssinatura } from "@/lib/planGuard";
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { user, estado } = await requireAssinatura();
+  const naoLidas = await totalNaoLidas(user.clientId);
 
   return (
     <SidebarProvider>
@@ -21,6 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           subtitle={user.clientName ?? "Minha conta"}
           plano={estado.plano}
           diasDeTeste={estado.diasDeTeste}
+          chatNaoLidas={naoLidas}
         />
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>

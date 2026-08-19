@@ -15,26 +15,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { CANAIS, CANAL_LABEL, CANAL_SERIE } from "@/lib/canais";
 import { brl } from "@/lib/format";
 
 /**
  * Paleta categórica validada (dataviz/scripts/validate_palette.js) nos dois modos,
  * all-pairs. Ordem fixa — nunca ciclar, nunca reatribuir por ranking.
- *   slot 1 violet · slot 2 orange · slot 3 aqua
+ *   slot 1 violeta (ML) · 2 laranja (Shopee) · 3 aqua (TikTok) · 4 azul (SHEIN) · 5 vinho (Atacado)
  */
-const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)"] as const;
+const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)"] as const;
 
-const PLATFORM_SERIES: Record<string, string> = {
-  MERCADO_LIVRE: SERIES[0],
-  SHOPEE: SERIES[1],
-  TIKTOK_SHOP: SERIES[2],
-};
-
-const PLATFORM_NAME: Record<string, string> = {
-  MERCADO_LIVRE: "Mercado Livre",
-  SHOPEE: "Shopee",
-  TIKTOK_SHOP: "TikTok Shop",
-};
+const PLATFORM_SERIES: Record<string, string> = CANAL_SERIE;
+const PLATFORM_NAME: Record<string, string> = CANAL_LABEL;
 
 const axisTick = { fill: "var(--axis-ink)", fontSize: 11 };
 
@@ -126,16 +118,22 @@ function TableView({ head, rows }: { head: string[]; rows: string[][] }) {
 /* Linha — faturamento diário por plataforma                                   */
 /* -------------------------------------------------------------------------- */
 
-export type RevenuePoint = { day: number; MERCADO_LIVRE: number; SHOPEE: number; TIKTOK_SHOP: number };
+export type RevenuePoint = { day: number } & Partial<Record<(typeof CANAIS)[number], number>>;
 
 export function RevenueLine({ data }: { data: RevenuePoint[] }) {
-  const platforms = ["MERCADO_LIVRE", "SHOPEE", "TIKTOK_SHOP"] as const;
   const totals = Object.fromEntries(
-    platforms.map((p) => [p, data.reduce((s, d) => s + d[p], 0)]),
+    CANAIS.map((c) => [c, data.reduce((s, d) => s + (d[c] ?? 0), 0)]),
   ) as Record<string, number>;
+  // Cinco linhas rentes ao zero destroem a leitura — só desenha o canal que
+  // teve movimento no período.
+  const platforms = CANAIS.filter((c) => totals[c] > 0);
 
   const fmtDay = (v: number) =>
     new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(v));
+
+  if (platforms.length === 0) {
+    return <p className="py-12 text-center text-sm text-ink-muted">Sem dados no período.</p>;
+  }
 
   return (
     <div>
@@ -205,12 +203,8 @@ export function RevenueLine({ data }: { data: RevenuePoint[] }) {
 /* Rosca — composição de custo                                                 */
 /* -------------------------------------------------------------------------- */
 
-export function CostDonut({ profit, tax, ads }: { profit: number; tax: number; ads: number }) {
-  const data = [
-    { name: "Lucro líquido", value: Math.max(0, profit), color: SERIES[0] },
-    { name: "Imposto", value: Math.max(0, tax), color: SERIES[1] },
-    { name: "ADS", value: Math.max(0, ads), color: SERIES[2] },
-  ];
+export function CostDonut({ fatias }: { fatias: Array<{ label: string; value: number }> }) {
+  const data = fatias.map((f, i) => ({ name: f.label, value: Math.max(0, f.value), color: SERIES[i % SERIES.length] }));
   const total = data.reduce((s, d) => s + d.value, 0);
   const share = (v: number) => (total ? `${((v / total) * 100).toFixed(1).replace(".", ",")}%` : "0%");
 
@@ -323,6 +317,73 @@ export function MarginBars({ data }: { data: Array<{ platform: string; margin: n
         head={["Plataforma", "Margem", "Faturamento"]}
         rows={rows.map((r) => [r.name, `${r.margin.toFixed(1).replace(".", ",")}%`, brl(r.revenue)])}
       />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Linha — fluxo de caixa                                                      */
+/* -------------------------------------------------------------------------- */
+
+export type CashFlowPoint = { dia: string; entrada: number; saida: number; saldo: number };
+
+/**
+ * Entrada/saída usam as cores de status (bom/crítico) — aqui não é
+ * identidade categórica, é dinheiro entrando ou saindo. Saldo acumulado fica
+ * na cor da marca, terceira linha.
+ */
+export function CashFlowLine({ data }: { data: CashFlowPoint[] }) {
+  const temMovimento = data.some((d) => d.entrada > 0 || d.saida > 0);
+  if (!temMovimento) {
+    return <p className="py-12 text-center text-sm text-ink-muted">Sem movimentação no período.</p>;
+  }
+
+  const fmtDia = (v: string) =>
+    new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${v}T00:00:00Z`));
+
+  const SERIES_FLUXO = { entrada: "var(--good)", saida: "var(--critical)", saldo: "var(--brand)" };
+  const NOME_FLUXO = { entrada: "Entradas", saida: "Saídas", saldo: "Saldo acumulado" };
+
+  return (
+    <div>
+      <div className="h-[260px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+            <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="dia" tickFormatter={fmtDia} tick={axisTick} axisLine={{ stroke: "var(--axis)" }} tickLine={false} minTickGap={28} />
+            <YAxis tickFormatter={(v: number) => brl(v, true)} tick={axisTick} axisLine={false} tickLine={false} width={64} />
+            <Tooltip
+              cursor={{ stroke: "var(--axis)", strokeWidth: 1 }}
+              content={({ active, payload, label }) =>
+                active && payload?.length ? (
+                  <TooltipBox
+                    title={fmtDia(String(label))}
+                    rows={payload.map((p) => ({
+                      label: NOME_FLUXO[p.dataKey as keyof typeof NOME_FLUXO] ?? String(p.dataKey),
+                      value: brl(Number(p.value ?? 0)),
+                      color: SERIES_FLUXO[p.dataKey as keyof typeof SERIES_FLUXO],
+                    }))}
+                  />
+                ) : null
+              }
+            />
+            {(["entrada", "saida", "saldo"] as const).map((k) => (
+              <Line
+                key={k}
+                type="monotone"
+                dataKey={k}
+                stroke={SERIES_FLUXO[k]}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-3">
+        <Legend items={(["entrada", "saida", "saldo"] as const).map((k) => ({ label: NOME_FLUXO[k], color: SERIES_FLUXO[k] }))} />
+      </div>
     </div>
   );
 }

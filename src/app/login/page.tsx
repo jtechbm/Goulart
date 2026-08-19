@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { comAviso, createSession, currentUser, homeFor, verifyPassword } from "@/lib/auth";
 import { Marca } from "@/components/Logo";
@@ -43,6 +44,9 @@ async function entrar(formData: FormData) {
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(user.id);
 
+  // Sem isso, o cache do router ainda lembra da versão sem sessão de "/" e só
+  // troca depois de um F5 — a sessão já existe, mas a tela não sabe disso.
+  revalidatePath("/", "layout");
   redirect(homeFor());
 }
 

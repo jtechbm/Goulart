@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { comAviso, createSession, currentUser, hashPassword, homeFor } from "@/lib/auth";
 import { Marca } from "@/components/Logo";
@@ -62,6 +63,9 @@ async function cadastrar(formData: FormData) {
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(user.id);
 
+  // Mesmo motivo do login: sem isso, o cache do router ainda lembra da versão
+  // sem sessão de "/" e só troca depois de um F5.
+  revalidatePath("/", "layout");
   redirect(homeFor());
 }
 

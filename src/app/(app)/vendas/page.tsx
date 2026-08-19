@@ -6,6 +6,7 @@ import { requireClient } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { brl, num } from "@/lib/format";
 import { calcularLinha, faixaMargem, somar } from "@/lib/sales";
+import { configuracoes } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function VendasPage({
   const dias = PERIODOS.some((p) => String(p.dias) === sp.dias) ? Number(sp.dias) : 30;
   const desde = new Date(Date.now() - dias * 86400000);
 
-  const [pedidos, lojas] = await Promise.all([
+  const [pedidos, lojas, config] = await Promise.all([
     prisma.order.findMany({
       where: {
         account: { clientId: user.clientId, ...(sp.loja ? { id: sp.loja } : {}) },
@@ -60,12 +61,13 @@ export default async function VendasPage({
       select: { id: true, shopName: true },
       orderBy: { shopName: "asc" },
     }),
+    configuracoes(user.clientId),
   ]);
 
   // Calcula uma vez e reaproveita no resumo e nas linhas.
   const calculados = pedidos.map((p) => ({
     pedido: p,
-    linhas: p.items.map((i) => ({ item: i, r: calcularLinha(i) })),
+    linhas: p.items.map((i) => ({ item: i, r: calcularLinha(i, config.taxRate) })),
   }));
   const todas = calculados.flatMap((c) => c.linhas.map((l) => l.r));
   const resumo = somar(todas);
