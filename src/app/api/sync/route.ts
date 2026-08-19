@@ -17,6 +17,15 @@ export const maxDuration = 300;
  *
  * Aqui não há sessão nenhuma: ou vem o segredo certo, ou é 401. Se
  * `CRON_SECRET` não estiver definido, a rota fecha em vez de abrir.
+ *
+ * O agendamento vive em `vercel.json`: diário às 06:00 de Brasília, com
+ * janela de 30 dias. A janela é larga de propósito — cobre o pedido novo e
+ * também a mudança retroativa (cancelamento, ajuste de taxa) que o
+ * marketplace lança dias depois.
+ *
+ * Por que uma vez ao dia e não de hora em hora: o plano Hobby da Vercel
+ * limita cron a um disparo diário. De hora em hora exige o plano Pro. Até
+ * lá, o lojista tem o botão de sincronizar agora em /lojas.
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
