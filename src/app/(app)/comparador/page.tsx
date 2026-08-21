@@ -2,7 +2,7 @@ import { ExternalLink, Search, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { BuscarPrecosBotao } from "@/components/BuscarPrecosBotao";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
+import { BotaoLink, Card, CardHeader, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { supportsAiSearch } from "@/lib/aiMarketSearch";
 import { requireRecurso } from "@/lib/planGuard";
 import { prisma } from "@/lib/db";
@@ -101,7 +101,8 @@ export default async function ComparadorPage({
           {products.length === 0 ? (
               <Empty
                 title="Nenhum produto ainda"
-                hint="Conecte uma loja e rode o sync, ou cadastre um produto no Estoque."
+                hint="Você precisa de ao menos um produto para comparar preços."
+                action={<BotaoLink href="/estoque">Ir para o Estoque</BotaoLink>}
               />
             ) : (
               <ul className="divide-y divide-[var(--border)]">

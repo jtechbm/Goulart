@@ -1,7 +1,7 @@
 import { DollarSign, Megaphone, Receipt, ShoppingCart, TrendingUp } from "lucide-react";
 import { CostDonut, MarginBars, RevenueLine } from "@/components/charts";
 import { Topbar } from "@/components/Topbar";
-import { Card, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
+import { BotaoLink, Card, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { CANAIS } from "@/lib/canais";
 import { brl, num } from "@/lib/format";
@@ -41,7 +41,8 @@ export default async function FaturamentoPage() {
           <Card>
             <Empty
               title="Nenhuma loja conectada"
-              hint="Conecte sua primeira loja em Integrações para ver o faturamento aqui."
+              hint="Conecte sua primeira loja para o faturamento aparecer aqui."
+              action={<BotaoLink href="/integracoes">Conectar uma loja</BotaoLink>}
             />
           </Card>
         </main>

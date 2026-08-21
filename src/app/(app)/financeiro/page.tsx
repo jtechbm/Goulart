@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, Plus, Wallet } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { BotaoSalvar } from "@/components/BotaoSalvar";
 import { redirect } from "next/navigation";
 import { CashFlowLine, CostDonut } from "@/components/charts";
 import { PrintButton } from "@/components/PrintButton";
@@ -264,7 +265,18 @@ async function AbaLancamentos({ clientId, kind }: { clientId: string; kind: "REC
             </Campo>
           </div>
           {clientes.length > 0 && (
-            <Campo label={kind === "RECEBER" ? "Cliente" : "Fornecedor"} hint="Opcional.">
+            <div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <span className="block text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+                {kind === "RECEBER" ? "Cliente" : "Fornecedor"} (opcional)
+              </span>
+              <Link
+                href={`/gerenciamento?aba=${kind === "RECEBER" ? "clientes" : "fornecedores"}`}
+                className="text-[12px] font-semibold text-brand hover:underline"
+              >
+                + Cadastrar {kind === "RECEBER" ? "cliente" : "fornecedor"}
+              </Link>
+            </div>
             <select name="customerId" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
               <option value="">{kind === "RECEBER" ? "Sem cliente vinculado" : "Sem fornecedor vinculado"}</option>
               {clientes.map((c) => (
@@ -273,11 +285,9 @@ async function AbaLancamentos({ clientId, kind }: { clientId: string; kind: "REC
                 </option>
               ))}
             </select>
-            </Campo>
+            </div>
           )}
-          <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
-            <Plus size={15} /> Lançar
-          </button>
+          <BotaoSalvar carregando="Lançando…"><Plus size={15} /> Lançar</BotaoSalvar>
         </form>
       </Card>
     </div>

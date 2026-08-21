@@ -3,7 +3,7 @@ import Link from "next/link";
 import { RevenueLine } from "@/components/charts";
 import { PrimeirosPassos } from "@/components/PrimeirosPassos";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
+import { BotaoLink, Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { brl, num } from "@/lib/format";
@@ -83,7 +83,8 @@ export default async function InicioPage() {
           {rollups.length === 0 ? (
             <Empty
               title="Nenhuma loja conectada"
-              hint="Conecte sua primeira loja em Integrações para ver os números aqui."
+              hint="Conecte sua primeira loja para os números aparecerem aqui."
+              action={<BotaoLink href="/integracoes">Conectar uma loja</BotaoLink>}
             />
           ) : (
             <ul className="divide-y divide-[var(--border)]">

@@ -1,14 +1,15 @@
 import { DollarSign, Package, PackagePlus, Plus, Store, Trash2, TrendingUp, Upload } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { BotaoSalvar } from "@/components/BotaoSalvar";
 import { redirect } from "next/navigation";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
-import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
+import { BotaoLink, Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
 import { comAviso } from "@/lib/auth";
 import { requireClientAtivo } from "@/lib/planGuard";
 import { listarClientesAtivos } from "@/lib/customers";
-import { brl, num } from "@/lib/format";
+import { brl, local, num } from "@/lib/format";
 import { createManualProduct } from "@/lib/inventory";
 import { faixaMargem } from "@/lib/sales";
 import { configuracoes } from "@/lib/settings";
@@ -190,7 +191,8 @@ async function AbaPedidos({ clientId }: { clientId: string }) {
       <Card>
         <Empty
           title="Nenhum pedido de atacado ainda"
-          hint="Crie o primeiro em “Novo pedido”, depois de definir preços de atacado no Catálogo."
+          hint="Venda direto para lojistas, sem passar por marketplace — e o estoque baixa junto."
+          action={<BotaoLink href="/atacado?aba=novo">Criar o primeiro pedido</BotaoLink>}
         />
       </Card>
     );
@@ -391,9 +393,7 @@ async function AbaCatalogo({ clientId }: { clientId: string }) {
                 <input name="wholesaleMinQty" type="number" min="1" defaultValue={1} className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
               </Campo>
             </div>
-            <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
-              <PackagePlus size={15} /> Criar produto
-            </button>
+            <BotaoSalvar carregando="Criando…"><PackagePlus size={15} /> Criar produto</BotaoSalvar>
           </form>
         </Card>
       </div>
@@ -408,12 +408,27 @@ async function AbaNovoPedido({ clientId }: { clientId: string }) {
     return (
       <Card>
         <Empty
-          title="Faltam clientes ou produtos de atacado"
-          hint={clientes.length === 0 ? "Cadastre um cliente em Gerenciamento primeiro." : "Defina ao menos um preço de atacado na aba Catálogo primeiro."}
+          title="Antes de vender no atacado, faltam dois cadastros"
+          hint="Um pedido de atacado precisa de para quem vender e do que vender."
           action={
-            <Link href={clientes.length === 0 ? "/gerenciamento" : "/atacado?aba=catalogo"} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
-              {clientes.length === 0 ? "Ir para Gerenciamento" : "Ir para o Catálogo"}
-            </Link>
+            /* Os dois botões aparecem juntos quando faltam os dois: mostrar só
+               um esconde metade do caminho, e a pessoa volta aqui e trava de
+               novo. O que já está feito vira texto riscado, para ela ver o
+               progresso em vez de adivinhar. */
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {clientes.length === 0 ? (
+                <BotaoLink href="/gerenciamento?aba=clientes">1. Cadastrar um cliente</BotaoLink>
+              ) : (
+                <span className="text-[13px] text-ink-muted line-through">1. Cliente cadastrado</span>
+              )}
+              {produtos.length === 0 ? (
+                <BotaoLink href="/atacado?aba=catalogo" tom={clientes.length === 0 ? "secundario" : "primario"}>
+                  2. Definir preço de atacado
+                </BotaoLink>
+              ) : (
+                <span className="text-[13px] text-ink-muted line-through">2. Preço de atacado definido</span>
+              )}
+            </div>
           }
         />
       </Card>
@@ -425,19 +440,32 @@ async function AbaNovoPedido({ clientId }: { clientId: string }) {
       <CardHeader title="Novo pedido de atacado" subtitle="Baixa o estoque na hora, do mesmo jeito que o /estoque faz manualmente." />
       <form action={criarPedido} className="space-y-4 px-5 py-5">
         <div>
-          <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-ink-muted">Cliente</label>
+          {/* O atalho fica colado no campo, e não escondido num menu: é aqui
+              que a pessoa descobre que falta cliente, e mandá-la procurar
+              "Gerenciamento" sozinha é onde ela desiste. */}
+          <div className="mb-1.5 flex items-baseline justify-between gap-3">
+            <label className="block text-[11px] font-semibold uppercase tracking-widest text-ink-muted">Cliente</label>
+            <Link href="/gerenciamento?aba=clientes" className="text-[12px] font-semibold text-brand hover:underline">
+              + Cadastrar cliente
+            </Link>
+          </div>
           <select name="customerId" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
             {clientes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
-                {c.city ? ` — ${c.city}/${c.uf}` : ""}
+                {local(c.city, c.uf) && ` — ${local(c.city, c.uf)}`}
               </option>
             ))}
           </select>
         </div>
 
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">Itens</p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">Itens</p>
+            <Link href="/atacado?aba=catalogo" className="text-[12px] font-semibold text-brand hover:underline">
+              + Adicionar produto ao atacado
+            </Link>
+          </div>
           {produtos.map((p) => (
             <div key={p.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
               <input type="hidden" name="productId" value={p.id} />
@@ -466,9 +494,7 @@ async function AbaNovoPedido({ clientId }: { clientId: string }) {
           ))}
         </div>
 
-        <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
-          <Plus size={15} /> Registrar pedido
-        </button>
+        <BotaoSalvar carregando="Registrando…"><Plus size={15} /> Registrar pedido</BotaoSalvar>
       </form>
     </Card>
   );

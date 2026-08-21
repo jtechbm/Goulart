@@ -1,13 +1,14 @@
 import { Plus, UserCheck, UserX } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { BotaoSalvar } from "@/components/BotaoSalvar";
 import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Campo, Card, CardHeader, Empty, PageHeader } from "@/components/ui";
 import { comAviso } from "@/lib/auth";
 import { requireClientAtivo } from "@/lib/planGuard";
 import { alternarAtivoCustomer, criarCustomer, listarCustomers, type CustomerKind } from "@/lib/customers";
-import { brl, date, num } from "@/lib/format";
+import { brl, date, local, num } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,7 @@ export default async function GerenciamentoPage({
                           <p className="text-[13px] text-ink-2">{c.email ?? "—"}</p>
                           <p className="text-[12px] text-ink-muted">{c.phone ?? "—"}</p>
                         </td>
-                        <td className="px-5 py-4 text-ink-2">{c.city ? `${c.city}/${c.uf ?? ""}` : "—"}</td>
+                        <td className="px-5 py-4 text-ink-2">{local(c.city, c.uf) || "—"}</td>
                         {atual.key === "CLIENTE" && (
                           <>
                             <td className="px-5 py-4 text-right text-ink-2 tabular">{num(c.pedidos)}</td>
@@ -199,9 +200,7 @@ export default async function GerenciamentoPage({
                 </select>
                 </Campo>
               </div>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
-                <Plus size={15} /> Cadastrar
-              </button>
+              <BotaoSalvar carregando="Cadastrando…"><Plus size={15} /> Cadastrar</BotaoSalvar>
             </form>
           </Card>
         </div>

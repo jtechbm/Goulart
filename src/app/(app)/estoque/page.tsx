@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
-import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
+import { BotaoLink, Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { comAviso } from "@/lib/auth";
 import { requireClientAtivo } from "@/lib/planGuard";
 import { prisma } from "@/lib/db";
@@ -211,7 +211,8 @@ export default async function EstoquePage({
           <Card>
             <Empty
               title="Nenhum produto"
-              hint="Conecte uma loja em Integrações ou cadastre um produto manual abaixo."
+              hint="Os produtos chegam sozinhos quando você conecta uma loja — ou cadastre um à mão no formulário abaixo."
+              action={<BotaoLink href="/integracoes">Conectar uma loja</BotaoLink>}
             />
           </Card>
         ) : (

@@ -2,7 +2,7 @@ import { MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { ChatThread } from "@/components/ChatThread";
 import { Topbar } from "@/components/Topbar";
-import { Avatar, Card, Empty, PlatformBadge } from "@/components/ui";
+import { Avatar, BotaoLink, Card, Empty, PlatformBadge } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { conversaComMensagens, conversas } from "@/lib/chat";
 import { relative } from "@/lib/format";
@@ -32,7 +32,11 @@ export default async function ChatPage({
 
         {lista.length === 0 ? (
           <Card>
-            <Empty title="Nenhuma conversa ainda" hint="As mensagens dos marketplaces e do atacado aparecem aqui." />
+            <Empty
+              title="Nenhuma conversa ainda"
+              hint="As mensagens dos seus compradores aparecem aqui depois que uma loja está conectada."
+              action={<BotaoLink href="/integracoes">Conectar uma loja</BotaoLink>}
+            />
           </Card>
         ) : (
           <Card className="flex min-h-[560px] flex-1 overflow-hidden">

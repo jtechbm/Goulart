@@ -47,3 +47,17 @@ export function variation(current: number, previous: number): number {
   if (previous === 0) return current === 0 ? 0 : 100;
   return ((current - previous) / previous) * 100;
 }
+
+/**
+ * "São Paulo/SP", "São Paulo", "SP" ou "" — nunca "São Paulo/null".
+ *
+ * Existe porque montar isso na mão com template literal imprime o `null` na
+ * cara do lojista assim que um dos dois campos fica vazio, e os dois são
+ * opcionais no cadastro.
+ */
+export function local(city?: string | null, uf?: string | null): string {
+  const c = city?.trim();
+  const u = uf?.trim();
+  if (c && u) return `${c}/${u}`;
+  return c || u || "";
+}

@@ -1,7 +1,7 @@
 import { DollarSign, Link2Off, Package, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
-import { Card, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
+import { BotaoLink, Card, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { brl, num } from "@/lib/format";
@@ -173,6 +173,7 @@ export default async function VendasPage({
             <Empty
               title="Nenhuma venda no período"
               hint="As vendas aparecem aqui depois que uma loja conectada sincroniza os pedidos."
+              action={<BotaoLink href="/lojas">Sincronizar minhas lojas</BotaoLink>}
             />
           </Card>
         ) : (

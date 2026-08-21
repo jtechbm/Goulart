@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { APP_NAME } from "@/lib/brand";
 import { CANAL_COR, CANAL_LABEL, CANAL_SHORT, type Canal } from "@/lib/canais";
@@ -210,5 +211,39 @@ export function Campo({
       {children}
       {hint && <span className="mt-1 block text-[11px] text-ink-muted">{hint}</span>}
     </label>
+  );
+}
+
+/**
+ * Botão que leva a outra tela.
+ *
+ * Existe porque tela vazia que só *descreve* a saída ("cadastre um cliente em
+ * Gerenciamento") é um beco sem saída para quem nunca usou um ERP: a pessoa
+ * precisa descobrir sozinha onde fica Gerenciamento, sair dali, cadastrar e
+ * voltar. O botão faz o caminho.
+ *
+ * Use `tom="secundario"` quando ele divide espaço com a ação principal da tela
+ * — dois botões cheios competindo entre si não dizem por onde começar.
+ */
+export function BotaoLink({
+  href,
+  children,
+  tom = "primario",
+}: {
+  href: string;
+  children: ReactNode;
+  tom?: "primario" | "secundario";
+}) {
+  const estilo =
+    tom === "primario"
+      ? "bg-brand text-brand-ink hover:bg-brand-hover"
+      : "border border-line text-ink-2 hover:bg-surface-2 hover:text-ink";
+  return (
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${estilo}`}
+    >
+      {children}
+    </Link>
   );
 }

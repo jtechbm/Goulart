@@ -2,7 +2,7 @@ import { AlertTriangle, Boxes, CircleAlert, DollarSign, Percent, TrendingUp, Wal
 import Link from "next/link";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
+import { BotaoLink, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
 import { requireRecurso } from "@/lib/planGuard";
 import { lancamentos, resumoFinanceiro, STATUS_COR, STATUS_LABEL } from "@/lib/finance";
 import { brl, date, num } from "@/lib/format";
@@ -117,7 +117,11 @@ async function RelatorioAnalitico({ clientId, dias }: { clientId: string; dias: 
   if (a.pedidos === 0) {
     return (
       <Card>
-        <Empty title="Nenhuma venda no período" hint="O analítico é montado a partir dos pedidos de marketplace e de atacado." />
+        <Empty
+          title="Nenhuma venda no período"
+          hint="O analítico é montado a partir dos pedidos de marketplace e de atacado."
+          action={<BotaoLink href="/lojas">Sincronizar minhas lojas</BotaoLink>}
+        />
       </Card>
     );
   }
@@ -274,7 +278,11 @@ async function RelatorioFaturamento({ clientId, dias }: { clientId: string; dias
   if (r.pedidos === 0) {
     return (
       <Card>
-        <Empty title="Nenhuma venda no período" hint="O relatório é montado a partir dos pedidos sincronizados das suas lojas." />
+        <Empty
+          title="Nenhuma venda no período"
+          hint="O relatório é montado a partir dos pedidos sincronizados das suas lojas."
+          action={<BotaoLink href="/lojas">Sincronizar minhas lojas</BotaoLink>}
+        />
       </Card>
     );
   }
@@ -377,7 +385,11 @@ async function RelatorioProdutos({ clientId, dias }: { clientId: string; dias: n
   if (r.porProduto.length === 0) {
     return (
       <Card>
-        <Empty title="Nenhuma venda no período" hint="O relatório por produto é montado a partir dos itens vendidos." />
+        <Empty
+          title="Nenhuma venda no período"
+          hint="O relatório por produto é montado a partir dos itens vendidos."
+          action={<BotaoLink href="/lojas">Sincronizar minhas lojas</BotaoLink>}
+        />
       </Card>
     );
   }
