@@ -8,7 +8,7 @@
 export const CANAIS = ["MERCADO_LIVRE", "SHOPEE", "TIKTOK_SHOP", "SHEIN", "ATACADO"] as const;
 export type Canal = (typeof CANAIS)[number];
 
-/** Canais que representam venda por fora dos marketplaces (hoje só o Atacado). */
+/** Só os marketplaces de verdade — tudo menos o canal interno de Atacado. */
 export const MARKETPLACES = CANAIS.filter((c) => c !== "ATACADO") as Exclude<Canal, "ATACADO">[];
 
 export const CANAL_LABEL: Record<Canal, string> = {

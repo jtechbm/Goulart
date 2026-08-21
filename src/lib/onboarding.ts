@@ -1,3 +1,4 @@
+import { MARKETPLACES } from "./canais";
 import { prisma } from "./db";
 
 /**
@@ -33,7 +34,12 @@ export type Progresso = {
 
 export async function progressoDoLojista(clientId: string): Promise<Progresso> {
   const [lojas, pedidos, comCusto, produtos] = await Promise.all([
-    prisma.account.count({ where: { clientId } }),
+    /**
+     * Só marketplace de verdade conta como "loja conectada". O canal ATACADO é
+     * interno e nasce sozinho na primeira visita a /atacado — contá-lo marcava
+     * o passo 1 como feito para quem nunca autorizou nada.
+     */
+    prisma.account.count({ where: { clientId, platform: { in: [...MARKETPLACES] } } }),
     prisma.order.count({ where: { account: { clientId } } }),
     prisma.product.count({ where: { account: { clientId }, cost: { gt: 0 } } }),
     prisma.product.count({ where: { account: { clientId } } }),
