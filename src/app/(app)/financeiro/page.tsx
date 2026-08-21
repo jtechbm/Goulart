@@ -118,7 +118,13 @@ export default async function FinanceiroPage({
           <Stat label="Saldo do mês" value={brl(resumo.saldoMes)} icon={<Wallet size={18} />} tone={resumo.saldoMes >= 0 ? "good" : "critical"} />
           <Stat label="A receber" value={brl(resumo.aReceber)} icon={<ArrowUpCircle size={18} />} tone="series-1" />
           <Stat label="A pagar" value={brl(resumo.aPagar)} icon={<ArrowDownCircle size={18} />} tone="series-2" />
-          <Stat label="Vencido" value={brl(resumo.vencido)} icon={<AlertTriangle size={18} />} tone="critical" />
+          <Stat
+            label="Vencido"
+            value={brl(resumo.vencido)}
+            hint={`${brl(resumo.vencidoPagar)} a pagar · ${brl(resumo.vencidoReceber)} a receber`}
+            icon={<AlertTriangle size={18} />}
+            tone="critical"
+          />
         </div>
 
         <div className="my-5 flex w-fit flex-wrap gap-1.5 rounded-xl border border-line bg-surface p-1 print:hidden">

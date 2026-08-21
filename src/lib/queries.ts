@@ -8,14 +8,21 @@ export const WINDOW_DAYS = 30;
 /** Alíquota efetiva usada nos consolidados. Ajuste conforme o regime tributário. */
 export const TAX_RATE = 0.113;
 
-/** Receita, custos e margem a partir dos rollups. */
-export function financials(rollups: AccountRollup[]) {
+/**
+ * Receita, custos e margem a partir dos rollups.
+ *
+ * A alíquota entra por parâmetro porque o lojista pode mudá-la em
+ * /configuracoes. Enquanto ela era lida da constante aqui dentro, /faturamento
+ * calculava imposto por 11,3% enquanto Vendas e Relatórios já usavam o valor
+ * configurado — duas telas discordando sobre a mesma receita.
+ */
+export function financials(rollups: AccountRollup[], aliquota: number = TAX_RATE) {
   const revenue = rollups.reduce((s, r) => s + r.revenue, 0);
   const prevRevenue = rollups.reduce((s, r) => s + r.prevRevenue, 0);
   const ads = rollups.reduce((s, r) => s + r.adsSpend, 0);
   const fees = rollups.reduce((s, r) => s + r.fees, 0);
   const orders = rollups.reduce((s, r) => s + r.orders, 0);
-  const tax = revenue * TAX_RATE;
+  const tax = revenue * aliquota;
   const profit = revenue - tax - ads - fees;
 
   return {

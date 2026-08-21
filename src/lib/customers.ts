@@ -105,3 +105,22 @@ export async function alternarAtivoCustomer(id: string, clientId: string) {
   if (!atual) throw new Error("Registro não encontrado.");
   return prisma.customer.update({ where: { id }, data: { active: !atual.active } });
 }
+
+/**
+ * Confere que o cliente/fornecedor pertence mesmo a esta loja.
+ *
+ * Existe porque `customerId` chega de um campo de formulário, e formulário é
+ * texto que o navegador manda — dá para trocar o id por um de outro lojista
+ * antes de enviar. Sem esta checagem o vínculo era aceito, e a tela depois
+ * exibia o NOME do cliente alheio junto do lançamento.
+ */
+export async function garantirCustomerDoCliente(
+  customerId: string | null | undefined,
+  clientId: string,
+): Promise<string | null> {
+  const id = customerId?.trim();
+  if (!id) return null;
+  const dono = await prisma.customer.findFirst({ where: { id, clientId }, select: { id: true } });
+  if (!dono) throw new Error("Cliente não encontrado.");
+  return dono.id;
+}

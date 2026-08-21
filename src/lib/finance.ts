@@ -1,3 +1,4 @@
+import { garantirCustomerDoCliente } from "./customers";
 import { prisma } from "./db";
 
 export const CATEGORIAS_RECEBER = ["VENDA_ATACADO", "REPASSE_MARKETPLACE", "OUTROS_RECEBIVEIS"] as const;
@@ -69,7 +70,8 @@ export async function resumoFinanceiro(clientId: string) {
 
   let aReceber = 0,
     aPagar = 0,
-    vencido = 0,
+    vencidoReceber = 0,
+    vencidoPagar = 0,
     entradasMes = 0,
     saidasMes = 0;
 
@@ -77,14 +79,32 @@ export async function resumoFinanceiro(clientId: string) {
     const status = statusDe(r);
     if (r.kind === "RECEBER" && status !== "PAGO") aReceber += r.amount;
     if (r.kind === "PAGAR" && status !== "PAGO") aPagar += r.amount;
-    if (status === "ATRASADO") vencido += r.amount;
+    /**
+     * Vencido sai separado por sentido. Somado num número só, "Vencido: R$ 5.000"
+     * em vermelho ao lado de "A pagar" lê como dívida — mas parte pode ser
+     * dinheiro que devem ao lojista, que é o oposto. O total continua existindo
+     * para quem só quer a soma.
+     */
+    if (status === "ATRASADO") {
+      if (r.kind === "RECEBER") vencidoReceber += r.amount;
+      else vencidoPagar += r.amount;
+    }
     if (status === "PAGO" && r.paidAt && r.paidAt >= inicioMes) {
       if (r.kind === "RECEBER") entradasMes += r.amount;
       else saidasMes += r.amount;
     }
   }
 
-  return { aReceber, aPagar, vencido, saldoMes: entradasMes - saidasMes, entradasMes, saidasMes };
+  return {
+    aReceber,
+    aPagar,
+    vencido: vencidoReceber + vencidoPagar,
+    vencidoReceber,
+    vencidoPagar,
+    saldoMes: entradasMes - saidasMes,
+    entradasMes,
+    saidasMes,
+  };
 }
 
 /** Entradas × saídas × saldo acumulado, por dia, alimenta o gráfico de caixa. */
@@ -97,14 +117,23 @@ export async function fluxoDeCaixa(clientId: string, dias: number) {
     select: { kind: true, amount: true, paidAt: true },
   });
 
+  /**
+   * A chave do dia é o dia LOCAL, não o UTC.
+   *
+   * `de` nasce da meia-noite local, mas `toISOString()` converte para UTC: no
+   * Brasil (UTC−3) um pagamento das 22h caía no balde do dia seguinte, e o
+   * gráfico empurrava toda venda de fim de tarde para a data errada.
+   */
+  const diaLocal = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const byDay = new Map<string, { entrada: number; saida: number }>();
   for (let i = 0; i <= dias; i++) {
-    const d = new Date(de.getTime() + i * 86400000);
-    byDay.set(d.toISOString().slice(0, 10), { entrada: 0, saida: 0 });
+    byDay.set(diaLocal(new Date(de.getTime() + i * 86400000)), { entrada: 0, saida: 0 });
   }
   for (const r of rows) {
     if (!r.paidAt) continue;
-    const chave = r.paidAt.toISOString().slice(0, 10);
+    const chave = diaLocal(r.paidAt);
     const bucket = byDay.get(chave);
     if (!bucket) continue;
     if (r.kind === "RECEBER") bucket.entrada += r.amount;
@@ -156,6 +185,12 @@ export async function criarLancamento(input: {
   const description = input.description.trim();
   if (!description) throw new Error("Descrição é obrigatória.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Valor inválido.");
+  // Data invalida chegava crua ao Prisma e virava erro tecnico na cara do lojista.
+  if (!(input.dueDate instanceof Date) || Number.isNaN(input.dueDate.getTime())) {
+    throw new Error("Data de vencimento inválida.");
+  }
+
+  const customerId = await garantirCustomerDoCliente(input.customerId, input.clientId);
 
   return prisma.financeEntry.create({
     data: {
@@ -165,7 +200,7 @@ export async function criarLancamento(input: {
       description,
       amount: input.amount,
       dueDate: input.dueDate,
-      customerId: input.customerId ?? null,
+      customerId,
       platform: input.platform ?? null,
       recurring: input.recurring ?? false,
       notes: input.notes?.trim() || null,

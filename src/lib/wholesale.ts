@@ -1,3 +1,4 @@
+import { garantirCustomerDoCliente } from "./customers";
 import { prisma } from "./db";
 import { moveStock } from "./inventory";
 import { calcularLinha, somar } from "./sales";
@@ -115,6 +116,9 @@ export async function criarPedidoAtacado(input: {
   }
 
   const account = await contaAtacado(input.clientId);
+  // Mesma armadilha do financeiro: o comprador vem de um <select> do formulario.
+  const customerId = await garantirCustomerDoCliente(input.customerId, input.clientId);
+  if (!customerId) throw new Error("Selecione o cliente do pedido.");
 
   const produtos = await prisma.product.findMany({
     where: { id: { in: input.itens.map((i) => i.productId) }, account: { clientId: input.clientId } },
@@ -135,7 +139,7 @@ export async function criarPedidoAtacado(input: {
       fees: 0,
       itemsCount,
       placedAt: new Date(),
-      customerId: input.customerId,
+      customerId,
       items: {
         create: input.itens.map((i) => {
           const produto = produtos.find((p) => p.id === i.productId)!;

@@ -5,24 +5,26 @@ import { Card, Delta, Empty, PageHeader, PlatformBadge, Stat } from "@/component
 import { requireClient } from "@/lib/auth";
 import { CANAIS } from "@/lib/canais";
 import { brl, num } from "@/lib/format";
-import { accountRollups, financials, revenueSeries, TAX_RATE, WINDOW_DAYS } from "@/lib/queries";
+import { accountRollups, financials, revenueSeries, WINDOW_DAYS } from "@/lib/queries";
+import { configuracoes } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function FaturamentoPage() {
   const user = await requireClient();
 
-  const [rollups, series] = await Promise.all([
+  const [rollups, series, config] = await Promise.all([
     accountRollups(user.clientId, WINDOW_DAYS),
     revenueSeries(user.clientId, WINDOW_DAYS),
+    configuracoes(user.clientId),
   ]);
 
-  const f = financials(rollups);
+  const f = financials(rollups, config.taxRate);
 
   const byPlatform = CANAIS
     .map((p) => {
       const scoped = rollups.filter((r) => r.platform === p);
-      const g = financials(scoped);
+      const g = financials(scoped, config.taxRate);
       return { platform: p, revenue: g.revenue, margin: g.margin };
     })
     .filter((p) => p.revenue > 0);
@@ -67,7 +69,7 @@ export default async function FaturamentoPage() {
           <Stat
             label="Imposto estimado"
             value={brl(f.tax)}
-            hint={`alíquota de ${(TAX_RATE * 100).toFixed(1).replace(".", ",")}%`}
+            hint={`alíquota de ${(config.taxRate * 100).toFixed(1).replace(".", ",")}%`}
             icon={<Receipt size={18} />}
             tone="series-2"
           />
