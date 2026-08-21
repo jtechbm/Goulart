@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Empty, PageHeader } from "@/components/ui";
+import { Campo, Card, CardHeader, Empty, PageHeader } from "@/components/ui";
 import { comAviso, requireClient } from "@/lib/auth";
 import { alternarAtivoCustomer, criarCustomer, listarCustomers, type CustomerKind } from "@/lib/customers";
 import { brl, date, num } from "@/lib/format";
@@ -169,15 +169,26 @@ export default async function GerenciamentoPage({
             <CardHeader title={atual.key === "CLIENTE" ? "Cadastrar cliente" : "Cadastrar fornecedor"} />
             <form action={novoRegistro} className="space-y-3 px-5 py-5">
               <input type="hidden" name="kind" value={atual.key} />
-              <input name="name" required placeholder="Nome / razão social" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
+              <Campo label="Nome / razão social">
+                <input name="name" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+              </Campo>
               <div className="grid gap-3 sm:grid-cols-2">
-                <input name="document" placeholder="CNPJ/CPF" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
-                <input name="phone" placeholder="Telefone" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
+                <Campo label="CNPJ / CPF" hint="Opcional.">
+                  <input name="document" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+                </Campo>
+                <Campo label="Telefone" hint="Opcional.">
+                  <input name="phone" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+                </Campo>
               </div>
               <div className="grid gap-3 sm:grid-cols-[1fr_1fr_100px]">
-                <input name="email" type="email" placeholder="E-mail" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
-                <input name="city" placeholder="Cidade" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
-                <select name="uf" aria-label="UF" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
+                <Campo label="E-mail" hint="Opcional.">
+                  <input name="email" type="email" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+                </Campo>
+                <Campo label="Cidade" hint="Opcional.">
+                  <input name="city" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+                </Campo>
+                <Campo label="UF">
+                <select name="uf" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
                   <option value="">UF</option>
                   {UFS.map((uf) => (
                     <option key={uf} value={uf}>
@@ -185,6 +196,7 @@ export default async function GerenciamentoPage({
                     </option>
                   ))}
                 </select>
+                </Campo>
               </div>
               <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
                 <Plus size={15} /> Cadastrar

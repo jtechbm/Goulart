@@ -177,3 +177,38 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
     </span>
   );
 }
+
+/**
+ * Rótulo + campo.
+ *
+ * Existe para o rótulo ser o caminho mais fácil, não uma lembrança. Todo campo
+ * do sistema precisa dizer, visível e o tempo todo, o que se espera dentro
+ * dele — `placeholder` não serve: some assim que a pessoa digita, e num campo
+ * numérico que já vem preenchido ("0", "1") ele nunca chega a aparecer. O
+ * usuário via um número solto sem saber se era estoque, preço ou quantidade.
+ *
+ * O `<label>` envolve o campo, então a associação com leitor de tela vale sem
+ * precisar de `id`/`htmlFor` — e clicar no texto foca o campo.
+ */
+export function Campo({
+  label,
+  hint,
+  children,
+  className = "",
+}: {
+  label: string;
+  /** Linha de apoio para unidade ou formato ("em reais", "un."). */
+  hint?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+        {label}
+      </span>
+      {children}
+      {hint && <span className="mt-1 block text-[11px] text-ink-muted">{hint}</span>}
+    </label>
+  );
+}

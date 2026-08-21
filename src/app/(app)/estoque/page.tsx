@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
+import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
 import { comAviso, requireClient } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { brl, num, relative } from "@/lib/format";
@@ -223,8 +223,8 @@ export default async function EstoquePage({
                     <th className="px-5 py-3.5">Loja</th>
                     <th className="px-5 py-3.5 text-right">Preço</th>
                     <th className="px-5 py-3.5 text-right">Estoque</th>
-                    <th className="px-5 py-3.5">Custo · Custo extra</th>
-                    <th className="px-5 py-3.5">Movimentar</th>
+                    <th className="px-5 py-3.5">Custo unitário · Custo extra</th>
+                    <th className="px-5 py-3.5">Movimentar (quantidade · motivo)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -356,35 +356,21 @@ export default async function EstoquePage({
               </p>
             ) : (
               <form action={novoProduto} className="space-y-3 px-5 py-5">
-                <input
-                  name="title"
-                  required
-                  placeholder="Nome do produto"
-                  className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted"
-                />
+                <Campo label="Nome do produto">
+                  <input name="title" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+                </Campo>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <input
-                    name="sku"
-                    placeholder="SKU"
-                    className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted"
-                  />
-                  <input
-                    name="price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Preço"
-                    className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular placeholder:text-ink-muted"
-                  />
-                  <input
-                    name="stock"
-                    type="number"
-                    min="0"
-                    defaultValue={0}
-                    aria-label="Estoque inicial"
-                    className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular"
-                  />
+                  <Campo label="SKU" hint="Código interno. Opcional.">
+                    <input name="sku" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+                  </Campo>
+                  <Campo label="Preço de venda" hint="Em reais.">
+                    <input name="price" type="number" min="0" step="0.01" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+                  </Campo>
+                  <Campo label="Estoque inicial" hint="Unidades disponíveis.">
+                    <input name="stock" type="number" min="0" defaultValue={0} className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+                  </Campo>
                 </div>
+                <Campo label="Loja" hint="Onde o produto ficará vinculado.">
                 <select
                   name="accountId"
                   className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink"
@@ -395,6 +381,7 @@ export default async function EstoquePage({
                     </option>
                   ))}
                 </select>
+                </Campo>
                 <button
                   type="submit"
                   className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover"

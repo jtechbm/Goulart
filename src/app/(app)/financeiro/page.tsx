@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { CashFlowLine, CostDonut } from "@/components/charts";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
+import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
 import { comAviso, requireClient } from "@/lib/auth";
 import { CANAL_LABEL } from "@/lib/canais";
 import { listarCustomers } from "@/lib/customers";
@@ -242,19 +242,28 @@ async function AbaLancamentos({ clientId, kind }: { clientId: string; kind: "REC
         <CardHeader title={kind === "RECEBER" ? "Novo recebível" : "Nova conta a pagar"} />
         <form action={novoLancamento} className="space-y-3 px-5 py-5">
           <input type="hidden" name="aba" value={aba} />
-          <input name="description" required placeholder="Descrição" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
+          <Campo label="Descrição" hint="Como este lançamento aparece na lista.">
+            <input name="description" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+          </Campo>
           <div className="grid gap-3 sm:grid-cols-3">
-            <select name="category" required className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
-              {categorias.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORIA_LABEL[c] ?? c}
-                </option>
-              ))}
-            </select>
-            <input name="amount" inputMode="decimal" required placeholder="Valor" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular placeholder:text-ink-muted" />
-            <input name="dueDate" type="date" required className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+            <Campo label="Categoria">
+              <select name="category" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
+                {categorias.map((c) => (
+                  <option key={c} value={c}>
+                    {CATEGORIA_LABEL[c] ?? c}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo label="Valor" hint="Em reais.">
+              <input name="amount" inputMode="decimal" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+            </Campo>
+            <Campo label="Vencimento" hint="Data em que este valor vence.">
+              <input name="dueDate" type="date" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+            </Campo>
           </div>
           {clientes.length > 0 && (
+            <Campo label={kind === "RECEBER" ? "Cliente" : "Fornecedor"} hint="Opcional.">
             <select name="customerId" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
               <option value="">{kind === "RECEBER" ? "Sem cliente vinculado" : "Sem fornecedor vinculado"}</option>
               {clientes.map((c) => (
@@ -263,6 +272,7 @@ async function AbaLancamentos({ clientId, kind }: { clientId: string; kind: "REC
                 </option>
               ))}
             </select>
+            </Campo>
           )}
           <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
             <Plus size={15} /> Lançar

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
-import { Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
+import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
 import { comAviso, requireClient } from "@/lib/auth";
 import { listarClientesAtivos } from "@/lib/customers";
 import { brl, num } from "@/lib/format";
@@ -269,7 +269,7 @@ async function AbaCatalogo({ clientId }: { clientId: string }) {
                   <th className="px-5 py-3.5">Origem</th>
                   <th className="px-5 py-3.5 text-right">Estoque</th>
                   <th className="px-5 py-3.5 text-right">Preço varejo</th>
-                  <th className="px-5 py-3.5">Preço de atacado · mín.</th>
+                  <th className="px-5 py-3.5">Preço de atacado · pedido mínimo</th>
                   <th className="px-5 py-3.5" />
                 </tr>
               </thead>
@@ -330,7 +330,7 @@ async function AbaCatalogo({ clientId }: { clientId: string }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Importar dos marketplaces" subtitle="Define um preço de atacado sem duplicar o produto — o estoque continua um só." />
+          <CardHeader title="Importar dos marketplaces" subtitle="Define um preço de atacado sem duplicar o produto — o estoque continua um só. O pedido mínimo entra como 6 unidades; ajuste depois no catálogo." />
           {paraImportar.length === 0 ? (
             <p className="px-5 py-5 text-[13px] text-ink-muted">Todos os produtos elegíveis já estão no atacado.</p>
           ) : (
@@ -343,15 +343,20 @@ async function AbaCatalogo({ clientId }: { clientId: string }) {
                       {brl(p.price)} no varejo · {num(p.stock)} em estoque
                     </p>
                   </div>
-                  <form action={precificar} className="flex shrink-0 items-center gap-1.5">
+                  <form action={precificar} className="flex shrink-0 items-end gap-1.5">
                     <input type="hidden" name="productId" value={p.id} />
-                    <input
-                      name="wholesalePrice"
-                      inputMode="decimal"
-                      placeholder="preço"
-                      aria-label={`Preço de atacado de ${p.title}`}
-                      className="w-20 rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink tabular placeholder:text-ink-muted"
-                    />
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Preço atacado
+                      </span>
+                      <input
+                        name="wholesalePrice"
+                        inputMode="decimal"
+                        required
+                        aria-label={`Preço de atacado de ${p.title}`}
+                        className="w-24 rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink tabular"
+                      />
+                    </label>
                     <input type="hidden" name="wholesaleMinQty" value={6} />
                     <button type="submit" className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1.5 text-[12px] font-medium text-ink-2 transition-colors hover:text-ink">
                       <Upload size={12} /> Importar
@@ -366,14 +371,24 @@ async function AbaCatalogo({ clientId }: { clientId: string }) {
         <Card>
           <CardHeader title="Cadastrar produto de atacado" subtitle="Exclusivo do atacado, sem anúncio em marketplace nenhum." />
           <form action={novoProdutoAtacado} className="space-y-3 px-5 py-5">
-            <input name="title" required placeholder="Nome do produto" className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
+            <Campo label="Nome do produto">
+              <input name="title" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink" />
+            </Campo>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input name="sku" placeholder="SKU" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted" />
-              <input name="stock" type="number" min="0" defaultValue={0} aria-label="Estoque inicial" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+              <Campo label="SKU" hint="Código interno. Opcional.">
+                <input name="sku" className={`w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink`} />
+              </Campo>
+              <Campo label="Estoque inicial" hint="Unidades disponíveis hoje.">
+                <input name="stock" type="number" min="0" defaultValue={0} className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+              </Campo>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input name="wholesalePrice" inputMode="decimal" required placeholder="Preço de atacado" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular placeholder:text-ink-muted" />
-              <input name="wholesaleMinQty" type="number" min="1" defaultValue={1} aria-label="Quantidade mínima" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+              <Campo label="Preço de atacado" hint="Em reais, por unidade.">
+                <input name="wholesalePrice" inputMode="decimal" required className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+              </Campo>
+              <Campo label="Pedido mínimo" hint="Quantidade mínima por compra.">
+                <input name="wholesaleMinQty" type="number" min="1" defaultValue={1} className="w-full rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink tabular" />
+              </Campo>
             </div>
             <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-hover">
               <PackagePlus size={15} /> Criar produto
@@ -432,15 +447,20 @@ async function AbaNovoPedido({ clientId }: { clientId: string }) {
                   {brl(p.wholesalePrice ?? 0)}/un · mín. {p.wholesaleMinQty} · {num(p.stock)} em estoque
                 </p>
               </div>
-              <input
-                name="quantidade"
-                type="number"
-                min="0"
-                max={p.stock}
-                defaultValue={0}
-                aria-label={`Quantidade de ${p.title}`}
-                className="w-20 rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink tabular"
-              />
+              <label className="block shrink-0">
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                  Quantidade
+                </span>
+                <input
+                  name="quantidade"
+                  type="number"
+                  min="0"
+                  max={p.stock}
+                  defaultValue={0}
+                  aria-label={`Quantidade de ${p.title}`}
+                  className="w-20 rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink tabular"
+                />
+              </label>
             </div>
           ))}
         </div>
