@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, Stat } from "@/components/ui";
-import { comAviso, requireClient } from "@/lib/auth";
+import { comAviso } from "@/lib/auth";
+import { requireClientAtivo } from "@/lib/planGuard";
 import { prisma } from "@/lib/db";
 import { brl, num, relative } from "@/lib/format";
 import {
@@ -34,7 +35,7 @@ function stockTone(stock: number) {
 
 async function movimentar(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
 
   const productId = String(formData.get("productId") ?? "");
   const qty = Math.abs(Number(formData.get("quantidade") ?? 0));
@@ -64,7 +65,7 @@ async function movimentar(formData: FormData) {
 
 async function salvarCustos(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
 
   const brlParaNumero = (v: FormDataEntryValue | null) =>
     Number(String(v ?? "0").replace(/\./g, "").replace(",", "."));
@@ -87,7 +88,7 @@ async function salvarCustos(formData: FormData) {
 
 async function novoProduto(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
 
   const title = String(formData.get("title") ?? "").trim();
   const accountId = String(formData.get("accountId") ?? "");
@@ -117,7 +118,7 @@ export default async function EstoquePage({
 }: {
   searchParams: Promise<{ filtro?: string; ok?: string; erro?: string; produto?: string }>;
 }) {
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const sp = await searchParams;
   const filtro = sp.filtro ?? "todos";
 

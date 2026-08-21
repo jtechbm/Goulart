@@ -4,14 +4,15 @@ import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Topbar } from "@/components/Topbar";
 import { Card, CardHeader, PageHeader } from "@/components/ui";
-import { comAviso, requireClient } from "@/lib/auth";
+import { comAviso } from "@/lib/auth";
+import { requireClientAtivo } from "@/lib/planGuard";
 import { configuracoes, salvarConfiguracoes } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 async function salvarEmpresaFiscal(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
 
   const r = await salvarConfiguracoes(user.clientId, {
     companyName: String(formData.get("companyName") ?? "").trim(),
@@ -33,7 +34,7 @@ async function salvarEmpresaFiscal(formData: FormData) {
 
 async function salvarNotificacoes(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   await salvarConfiguracoes(user.clientId, {
     notifyLowStock: formData.get("notifyLowStock") === "on",
     notifyFinance: formData.get("notifyFinance") === "on",
@@ -47,7 +48,7 @@ export default async function ConfiguracoesPage({
 }: {
   searchParams: Promise<{ ok?: string; erro?: string }>;
 }) {
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const sp = await searchParams;
   const config = await configuracoes(user.clientId);
 

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
 import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
-import { comAviso, requireClient } from "@/lib/auth";
+import { comAviso } from "@/lib/auth";
+import { requireClientAtivo } from "@/lib/planGuard";
 import { listarClientesAtivos } from "@/lib/customers";
 import { brl, num } from "@/lib/format";
 import { createManualProduct } from "@/lib/inventory";
@@ -34,7 +35,7 @@ const dia = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit",
 
 async function precificar(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const r = await definirPrecoAtacado({
     productId: String(formData.get("productId") ?? ""),
     clientId: user.clientId,
@@ -51,7 +52,7 @@ async function precificar(formData: FormData) {
 
 async function remover(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   await removerDoAtacado(String(formData.get("productId") ?? ""), user.clientId);
   revalidatePath("/atacado");
   redirect(comAviso("/atacado?aba=catalogo", "ok", "Produto removido do atacado."));
@@ -59,7 +60,7 @@ async function remover(formData: FormData) {
 
 async function novoProdutoAtacado(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const title = String(formData.get("title") ?? "").trim();
   const wholesalePrice = Number(String(formData.get("wholesalePrice") ?? "0").replace(",", "."));
   if (!title || wholesalePrice <= 0) {
@@ -94,7 +95,7 @@ async function novoProdutoAtacado(formData: FormData) {
 
 async function criarPedido(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
 
   const customerId = String(formData.get("customerId") ?? "");
   const productIds = formData.getAll("productId").map(String);
@@ -125,7 +126,7 @@ export default async function AtacadoPage({
 }: {
   searchParams: Promise<{ aba?: string; ok?: string; erro?: string }>;
 }) {
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const sp = await searchParams;
   const aba = ABAS.some((a) => a.key === sp.aba) ? sp.aba! : "pedidos";
 

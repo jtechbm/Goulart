@@ -6,7 +6,8 @@ import { CashFlowLine, CostDonut } from "@/components/charts";
 import { PrintButton } from "@/components/PrintButton";
 import { Topbar } from "@/components/Topbar";
 import { Campo, Card, CardHeader, Empty, PageHeader, PlatformBadge, PrintHeader, Stat } from "@/components/ui";
-import { comAviso, requireClient } from "@/lib/auth";
+import { comAviso } from "@/lib/auth";
+import { requireClientAtivo } from "@/lib/planGuard";
 import { CANAL_LABEL } from "@/lib/canais";
 import { listarCustomers } from "@/lib/customers";
 import {
@@ -37,7 +38,7 @@ const ABAS = [
 
 async function baixar(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const id = String(formData.get("id") ?? "");
   const aba = String(formData.get("aba") ?? "visao-geral");
   const ok = await baixarLancamento(id, user.clientId);
@@ -51,7 +52,7 @@ async function baixar(formData: FormData) {
 
 async function novoLancamento(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const aba = String(formData.get("aba") ?? "receber");
   const kind = aba === "pagar" ? "PAGAR" : "RECEBER";
 
@@ -89,7 +90,7 @@ export default async function FinanceiroPage({
 }: {
   searchParams: Promise<{ aba?: string; ok?: string; erro?: string }>;
 }) {
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const sp = await searchParams;
   const aba = ABAS.some((a) => a.key === sp.aba) ? sp.aba! : "visao-geral";
 

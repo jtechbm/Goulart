@@ -39,3 +39,26 @@ export async function requireRecurso(recurso: Recurso) {
   }
   return { user, estado };
 }
+
+/**
+ * Guarda padrão de **server action**.
+ *
+ * Devolve o mesmo formato de `requireClient`, então a troca no call site é
+ * mecânica — mas exige assinatura em dia.
+ *
+ * Por que ela precisa existir: `requireAssinatura` roda no layout do grupo
+ * `(app)`, e layout só executa em renderização de página. Server action é um
+ * POST comum: o layout não passa por ela. Enquanto as actions usavam
+ * `requireClient`, quem tinha assinatura vencida era expulso de todas as telas
+ * e mesmo assim continuava podendo **escrever** — lançar no financeiro, mexer
+ * em estoque, registrar pedido — chamando a action direto. A trava existia só
+ * na parte visual.
+ *
+ * Use `requireClient` apenas onde o acesso deve sobreviver à assinatura
+ * vencida, e diga por quê no call site. Hoje há dois casos: `/conta`, porque
+ * reter dado atrás de paywall contraria o art. 18 da LGPD, e a troca de senha.
+ */
+export async function requireClientAtivo() {
+  const { user } = await requireAssinatura();
+  return user;
+}

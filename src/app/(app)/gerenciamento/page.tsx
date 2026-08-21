@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Campo, Card, CardHeader, Empty, PageHeader } from "@/components/ui";
-import { comAviso, requireClient } from "@/lib/auth";
+import { comAviso } from "@/lib/auth";
+import { requireClientAtivo } from "@/lib/planGuard";
 import { alternarAtivoCustomer, criarCustomer, listarCustomers, type CustomerKind } from "@/lib/customers";
 import { brl, date, num } from "@/lib/format";
 
@@ -19,7 +20,7 @@ const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "
 
 async function novoRegistro(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const kind = (String(formData.get("kind") ?? "CLIENTE") === "FORNECEDOR" ? "FORNECEDOR" : "CLIENTE") as CustomerKind;
   const aba = kind === "CLIENTE" ? "clientes" : "fornecedores";
 
@@ -44,7 +45,7 @@ async function novoRegistro(formData: FormData) {
 
 async function alternarAtivo(formData: FormData) {
   "use server";
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const id = String(formData.get("id") ?? "");
   const aba = String(formData.get("aba") ?? "clientes");
   await alternarAtivoCustomer(id, user.clientId);
@@ -57,7 +58,7 @@ export default async function GerenciamentoPage({
 }: {
   searchParams: Promise<{ aba?: string; ok?: string; erro?: string }>;
 }) {
-  const user = await requireClient();
+  const user = await requireClientAtivo();
   const sp = await searchParams;
   const atual = ABAS.find((a) => a.slug === sp.aba) ?? ABAS[0];
 

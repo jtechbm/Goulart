@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { searchWithAi, supportsAiSearch } from "./aiMarketSearch";
-import { requireClient } from "./auth";
+import { requireRecurso } from "./planGuard";
 import { prisma } from "./db";
 
 /**
@@ -15,7 +15,11 @@ import { prisma } from "./db";
 export async function buscarPrecosConcorrentes(
   productId: string,
 ): Promise<{ ok: boolean; mensagem: string }> {
-  const user = await requireClient();
+  // A tela do Comparador é do plano Pro, e a busca por IA custa dinheiro na
+  // nossa conta da OpenAI a cada execução. Sem esta linha, a trava valia só
+  // para abrir a página: a action podia ser chamada direto por quem está no
+  // Básico ou com o teste vencido.
+  const { user } = await requireRecurso("comparador");
 
   // O escopo entra na consulta: a ação recebe um id do cliente, e sem isso
   // daria para disparar uma busca sobre o produto de outro lojista.
