@@ -192,7 +192,7 @@ async function AbaPedidos({ clientId }: { clientId: string }) {
         <Empty
           title="Nenhum pedido de atacado ainda"
           hint="Venda direto para lojistas, sem passar por marketplace — e o estoque baixa junto."
-          action={<BotaoLink href="/atacado?aba=novo">Criar o primeiro pedido</BotaoLink>}
+          action={<BotaoLink href="/atacado?aba=novo-pedido">Criar o primeiro pedido</BotaoLink>}
         />
       </Card>
     );
